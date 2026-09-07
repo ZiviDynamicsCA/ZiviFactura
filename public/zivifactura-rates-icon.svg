@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Tasas y calculadora">
+  <defs>
+    <linearGradient id="panel" x1="16" y1="12" x2="146" y2="150"><stop stop-color="#ffffff"/><stop offset=".65" stop-color="#f6fbff"/><stop offset="1" stop-color="#e9f7ff"/></linearGradient>
+    <linearGradient id="blue" x1="33" y1="28" x2="132" y2="72"><stop stop-color="#00dff5"/><stop offset=".5" stop-color="#079cff"/><stop offset="1" stop-color="#1458df"/></linearGradient>
+    <linearGradient id="gold" x1="24" y1="104" x2="126" y2="139"><stop stop-color="#ffd84d"/><stop offset=".55" stop-color="#ffb300"/><stop offset="1" stop-color="#ff8b00"/></linearGradient>
+    <linearGradient id="coin" x1="92" y1="86" x2="137" y2="132"><stop stop-color="#fff184"/><stop offset=".55" stop-color="#ffc928"/><stop offset="1" stop-color="#ff9d00"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="7" stdDeviation="8" flood-color="#1a68b8" flood-opacity=".16"/></filter>
+  </defs>
+  <rect x="5" y="5" width="150" height="150" rx="38" fill="url(#panel)" stroke="#d8edff" stroke-width="3"/>
+  <g filter="url(#shadow)">
+    <rect x="45" y="39" width="64" height="79" rx="15" fill="#f9fcff" stroke="#c9e1f7" stroke-width="3"/>
+    <rect x="55" y="49" width="44" height="17" rx="6" fill="url(#blue)"/>
+    <g fill="#79b9f5"><rect x="56" y="76" width="12" height="12" rx="4"/><rect x="73" y="76" width="12" height="12" rx="4"/><rect x="90" y="76" width="10" height="28" rx="4"/><rect x="56" y="93" width="12" height="12" rx="4"/><rect x="73" y="93" width="12" height="12" rx="4"/></g>
+    <path d="M44 115C26 104 22 82 33 66" fill="none" stroke="url(#gold)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M26 75l3-18 16 9" fill="url(#gold)"/>
+    <path d="M105 42c20 8 30 27 24 47" fill="none" stroke="url(#blue)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M136 81l-6 18-15-11" fill="url(#blue)"/>
+    <circle cx="116" cy="111" r="27" fill="url(#coin)" stroke="#ffb300" stroke-width="3"/>
+    <text x="116" y="121" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="800" fill="#0c7ce8">$</text>
+  </g>
+</svg>
