@@ -14,7 +14,15 @@ let statusCallback: StatusCallback | null = null
 const clean = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 const safeKey = (value: string) => encodeURIComponent(value.trim().toLowerCase()).slice(0, 900) || 'sin-id'
 const companyIdOf = (row?: { companyId?: number } | null) => Number(row?.companyId) || 1
-const invoiceLogicalKey = (invoice: Invoice) => `${companyIdOf(invoice)}:${invoice.number.trim().toLowerCase()}`
+const normalizeInvoiceNumber = (value = '') => {
+  const compact = value.trim().toLowerCase().replace(/\s+/g, '')
+  const match = compact.match(/^([^0-9]*)([0-9]+)$/)
+  if (!match) return compact.replace(/[^a-z0-9]/g, '')
+  const prefix = match[1].replace(/[^a-z0-9]/g, '')
+  const sequence = String(Number(match[2]))
+  return `${prefix}:${sequence}`
+}
+const invoiceLogicalKey = (invoice: Invoice) => `${companyIdOf(invoice)}:${normalizeInvoiceNumber(invoice.number)}`
 const invoiceKey = (invoice: Invoice) => safeKey(invoiceLogicalKey(invoice))
 const clientKey = (client: Client) => safeKey(`${companyIdOf(client)}:${client.taxId || client.email || client.phone || client.name || String(client.id || 'cliente')}`)
 const productKey = (product: Product) => safeKey(`${companyIdOf(product)}:${product.name || String(product.id || 'producto')}`)
@@ -43,7 +51,14 @@ async function pushCompanies(uid: string) {
 async function pushInvoices(uid: string) {
   if (!firestore) return
   const invoices = await db.invoices.toArray()
-  await Promise.all(invoices.map(invoice => setDoc(doc(firestore, 'users', uid, 'invoices', invoiceKey(invoice)), clean({ ...invoice, companyId: companyIdOf(invoice), id: undefined }), { merge: true })))
+  const canonical = new Map<string, Invoice>()
+  for (const invoice of invoices) {
+    if (!invoice.number?.trim()) continue
+    const key = invoiceLogicalKey(invoice)
+    const previous = canonical.get(key)
+    if (!previous || recordTime(invoice) >= recordTime(previous)) canonical.set(key, invoice)
+  }
+  await Promise.all([...canonical.values()].map(invoice => setDoc(doc(firestore, 'users', uid, 'invoices', invoiceKey(invoice)), clean({ ...invoice, companyId: companyIdOf(invoice), id: undefined }), { merge: true })))
 }
 async function pushClients(uid: string) {
   if (!firestore) return
@@ -137,8 +152,6 @@ async function pullInvoices(uid: string) {
       byKey.set(key, updated)
     }
 
-    // Migrate every logical invoice to one deterministic Firestore document.
-    // Older app versions could leave the same invoice under multiple document IDs.
     const canonicalId = invoiceKey(normalized)
     await setDoc(doc(firestore, 'users', uid, 'invoices', canonicalId), clean({ ...normalized, id: undefined }), { merge: true })
     const staleDocs = group.filter(snapshot => snapshot.id !== canonicalId)
@@ -208,16 +221,18 @@ export async function syncFirebaseNow(uid = activeUid || '') {
   if (!firestore || !uid || !navigator.onLine) return
   statusCallback?.('syncing', 'Sincronizando con Firebase…')
   applyingRemote = true
+  let removedInvoices = 0
   try {
     await Promise.all([pullCompanies(uid), pullInvoices(uid), pullClients(uid), pullProducts(uid), pullPayments(uid)])
-    await dedupeLocalInvoices()
+    removedInvoices = await dedupeLocalInvoices()
   } finally {
     applyingRemote = false
   }
   try {
     await Promise.all([pushCompanies(uid), pushInvoices(uid), pushClients(uid), pushProducts(uid), pushPayments(uid)])
     await setDoc(doc(firestore, 'users', uid, 'meta', 'sync'), { lastSyncAt: new Date().toISOString() }, { merge: true })
-    statusCallback?.('synced', 'Datos sincronizados')
+    statusCallback?.('synced', removedInvoices > 0 ? `Se corrigieron ${removedInvoices} documentos duplicados.` : 'Datos sincronizados')
+    window.dispatchEvent(new CustomEvent('zivifactura:data-synced', { detail: { removedInvoices } }))
   } catch (error) {
     console.warn('[ZiviFactura] Firebase sync:', error)
     statusCallback?.('error', 'No se pudo sincronizar. Se mantiene la copia local.')
