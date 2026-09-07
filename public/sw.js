@@ -1,5 +1,5 @@
-const CACHE = 'zivifactura-v24'
-const APP_SHELL = ['/', '/manifest.webmanifest?v=4', '/zivifactura-app-icon-v3.svg?v=1', '/zivifactura-header-light.svg?v=1', '/zivifactura-rates-icon.svg?v=1']
+const CACHE = 'zivifactura-v25'
+const APP_SHELL = ['/', '/manifest.webmanifest?v=5', '/zivifactura-app-icon-v3.svg?v=2', '/zivifactura-header-light.svg?v=2', '/zivifactura-rates-icon.svg?v=2']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL)))
