@@ -5,6 +5,7 @@ import InstallPrompt from './InstallPrompt'
 import QuickTools from './QuickTools'
 import ZiviChrome from './ZiviChrome'
 import { initAutomaticBackup } from './cloudBackup'
+import { dedupeStoredClients, startClientDedupWatcher } from './clientDedup'
 import './styles.css'
 import './payments.css'
 import './proofs.css'
@@ -35,13 +36,19 @@ window.addEventListener('appinstalled', () => {
   window.dispatchEvent(new Event('zivi-installed'))
 })
 
-initAutomaticBackup()
+async function bootstrap() {
+  await dedupeStoredClients().catch(error => console.warn('[ZiviFactura] client cleanup:', error))
+  startClientDedupWatcher()
+  initAutomaticBackup()
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <AuthShell />
-    <ZiviChrome />
-    <QuickTools />
-    <InstallPrompt />
-  </React.StrictMode>,
-)
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <AuthShell />
+      <ZiviChrome />
+      <QuickTools />
+      <InstallPrompt />
+    </React.StrictMode>,
+  )
+}
+
+void bootstrap()
