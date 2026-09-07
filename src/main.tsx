@@ -36,6 +36,15 @@ window.addEventListener('appinstalled', () => {
   window.dispatchEvent(new Event('zivi-installed'))
 })
 
+const INVOICE_REPAIR_RELOAD_KEY = 'zivifactura.invoice-repair-reload.v1'
+window.addEventListener('zivifactura:data-synced', (event) => {
+  const detail = (event as CustomEvent<{ removedInvoices?: number }>).detail
+  const removed = Number(detail?.removedInvoices || 0)
+  if (removed <= 0 || sessionStorage.getItem(INVOICE_REPAIR_RELOAD_KEY)) return
+  sessionStorage.setItem(INVOICE_REPAIR_RELOAD_KEY, '1')
+  window.setTimeout(() => window.location.reload(), 180)
+})
+
 async function bootstrap() {
   await dedupeStoredClients().catch(error => console.warn('[ZiviFactura] client cleanup:', error))
   startClientDedupWatcher()
