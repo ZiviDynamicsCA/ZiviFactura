@@ -26,6 +26,7 @@ type PwaWindow = Window & { __ziviInstallPrompt?: DeferredInstallPrompt | null }
 
 const pwaWindow = window as PwaWindow
 window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault()
   pwaWindow.__ziviInstallPrompt = event as DeferredInstallPrompt
   window.dispatchEvent(new Event('zivi-install-ready'))
 })
@@ -44,12 +45,3 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <InstallPrompt />
   </React.StrictMode>,
 )
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
-    .then(async (registration) => {
-      await registration.update().catch(() => undefined)
-      if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING')
-    })
-    .catch(() => undefined)
-}
