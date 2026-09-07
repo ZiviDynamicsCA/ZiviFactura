@@ -1,0 +1,153 @@
+/* ZiviFactura v28 — exact approved PNG assets and final mobile header alignment */
+
+body.zivi-v2-active #root{padding-top:82px!important}
+
+.ziviChromeV28{
+  height:82px!important;
+  padding:7px max(12px,calc((100vw - 1440px)/2 + 18px))!important;
+  gap:8px!important;
+  overflow:hidden!important;
+}
+
+.ziviChromeV28 .ziviInstitutionalLockup{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  max-width:410px!important;
+  height:68px!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  overflow:hidden!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+.ziviApprovedHeaderLogo{
+  display:block!important;
+  width:min(330px,100%)!important;
+  height:auto!important;
+  max-height:68px!important;
+  object-fit:contain!important;
+  object-position:left center!important;
+  flex:none!important;
+}
+
+/* Disable all earlier reconstructed/header marks. The approved PNG is the only brand art in the header. */
+.ziviChromeV28 .ziviBrandMark,
+.ziviChromeV28 .ziviBrandCopy,
+.ziviChromeV28 .ziviHeaderBrandAsset,
+.ziviChromeV28 .ziviHeaderLogoSvg,
+.ziviChromeV28 .ziviRibbonMark{display:none!important}
+
+.ziviChromeV28 .ziviChromeActions{
+  flex:0 0 auto!important;
+  min-width:0!important;
+  gap:6px!important;
+}
+
+.ziviChromeV28 .ziviBusinessSelect strong{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  line-height:1.08!important;
+}
+
+/* Tasas uses the exact approved calculator/currency PNG, not a generic line icon. */
+.quickDock button.tool svg{display:none!important}
+.quickDock button.tool::before{
+  content:""!important;
+  display:block!important;
+  width:30px!important;
+  height:30px!important;
+  flex:0 0 30px!important;
+  border:0!important;
+  border-radius:9px!important;
+  background:url('/zivifactura-rates-v28.png') center/contain no-repeat!important;
+  box-shadow:none!important;
+}
+.quickDock button.tool.active::before{
+  filter:drop-shadow(0 4px 8px rgba(0,136,230,.18));
+}
+
+/* Contextual calculator in the invoice remains an explicit financial action. */
+.inlineCalcButton{font-size:0!important}
+.inlineCalcButton::before{
+  content:'$'!important;
+  display:grid!important;
+  place-items:center!important;
+  width:24px!important;
+  height:24px!important;
+  border-radius:8px!important;
+  font-size:1rem!important;
+  font-weight:900!important;
+  line-height:1!important;
+  color:#087fdc!important;
+  background:linear-gradient(145deg,#f8fcff,#e7f7ff)!important;
+}
+.inlineCalcButton::after{display:none!important;content:none!important}
+
+@media(max-width:760px){
+  body.zivi-v2-active #root{padding-top:78px!important}
+  .ziviChromeV28{
+    height:78px!important;
+    padding:6px 9px!important;
+    gap:6px!important;
+  }
+  .ziviChromeV28 .ziviInstitutionalLockup{
+    height:62px!important;
+    max-width:none!important;
+  }
+  .ziviApprovedHeaderLogo{
+    width:205px!important;
+    max-width:100%!important;
+    max-height:62px!important;
+  }
+  .ziviChromeV28 .ziviChromeBell{
+    width:36px!important;
+    height:36px!important;
+    flex:0 0 36px!important;
+    border-radius:12px!important;
+  }
+  .ziviChromeV28 .ziviBusinessSelect{
+    width:128px!important;
+    min-width:128px!important;
+    max-width:128px!important;
+    height:50px!important;
+    padding:0 24px 0 9px!important;
+    gap:5px!important;
+    border-radius:14px!important;
+  }
+  .ziviChromeV28 .ziviBusinessSelect>svg:first-child{display:none!important}
+  .ziviChromeV28 .ziviBusinessSelect small{display:none!important}
+  .ziviChromeV28 .ziviBusinessSelect strong{font-size:.68rem!important}
+  .ziviChromeV28 .ziviBusinessChevron{right:7px!important}
+  .ziviChromeV28 .ziviAddBusiness,
+  .ziviChromeV28 .ziviLogout{display:none!important}
+  .quickDock button.tool::before{width:28px!important;height:28px!important;flex-basis:28px!important}
+}
+
+@media(max-width:420px){
+  .ziviChromeV28{padding-left:7px!important;padding-right:7px!important}
+  .ziviApprovedHeaderLogo{width:180px!important;max-height:58px!important}
+  .ziviChromeV28 .ziviBusinessSelect{
+    width:116px!important;
+    min-width:116px!important;
+    max-width:116px!important;
+    height:48px!important;
+  }
+  .ziviChromeV28 .ziviBusinessSelect strong{font-size:.63rem!important}
+}
+
+@media(max-width:370px){
+  .ziviApprovedHeaderLogo{width:160px!important}
+  .ziviChromeV28 .ziviChromeBell{width:34px!important;height:34px!important;flex-basis:34px!important}
+  .ziviChromeV28 .ziviBusinessSelect{
+    width:108px!important;
+    min-width:108px!important;
+    max-width:108px!important;
+    padding-left:7px!important;
+  }
+  .ziviChromeV28 .ziviBusinessSelect strong{font-size:.59rem!important}
+}
