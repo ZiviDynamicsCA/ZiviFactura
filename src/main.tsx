@@ -17,6 +17,23 @@ import './polish-v27.css'
 import './polish-v28.css'
 import './auth-v29.css'
 
+type DeferredInstallPrompt = Event & {
+  prompt?: () => Promise<void>
+  userChoice?: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
+type PwaWindow = Window & { __ziviInstallPrompt?: DeferredInstallPrompt | null }
+
+const pwaWindow = window as PwaWindow
+window.addEventListener('beforeinstallprompt', (event) => {
+  pwaWindow.__ziviInstallPrompt = event as DeferredInstallPrompt
+  window.dispatchEvent(new Event('zivi-install-ready'))
+})
+window.addEventListener('appinstalled', () => {
+  pwaWindow.__ziviInstallPrompt = null
+  window.dispatchEvent(new Event('zivi-installed'))
+})
+
 initAutomaticBackup()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -29,7 +46,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 )
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => undefined)
-  })
+  navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+    .then(async (registration) => {
+      await registration.update().catch(() => undefined)
+      if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING')
+    })
+    .catch(() => undefined)
 }
