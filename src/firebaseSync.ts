@@ -14,10 +14,12 @@ let statusCallback: StatusCallback | null = null
 const clean = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 const safeKey = (value: string) => encodeURIComponent(value.trim().toLowerCase()).slice(0, 900) || 'sin-id'
 const companyIdOf = (row?: { companyId?: number } | null) => Number(row?.companyId) || 1
-const invoiceKey = (invoice: Invoice) => safeKey(`${companyIdOf(invoice)}:${invoice.number}`)
+const invoiceLogicalKey = (invoice: Invoice) => `${companyIdOf(invoice)}:${invoice.number.trim().toLowerCase()}`
+const invoiceKey = (invoice: Invoice) => safeKey(invoiceLogicalKey(invoice))
 const clientKey = (client: Client) => safeKey(`${companyIdOf(client)}:${client.taxId || client.email || client.phone || client.name || String(client.id || 'cliente')}`)
 const productKey = (product: Product) => safeKey(`${companyIdOf(product)}:${product.name || String(product.id || 'producto')}`)
 const paymentKey = (payment: Payment) => safeKey(`${companyIdOf(payment)}:${payment.key}`)
+const recordTime = (row?: { updatedAt?: string; createdAt?: string } | null) => Date.parse(row?.updatedAt || row?.createdAt || '') || 0
 
 function companyForCloud(company: Company) {
   const copy = clean(company) as Company
@@ -77,21 +79,72 @@ async function pullCompanies(uid: string) {
   }
 }
 
+async function dedupeLocalInvoices() {
+  const rows = await db.invoices.toArray()
+  const groups = new Map<string, Invoice[]>()
+  for (const invoice of rows) {
+    if (!invoice.number?.trim()) continue
+    const key = invoiceLogicalKey(invoice)
+    const group = groups.get(key) || []
+    group.push(invoice)
+    groups.set(key, group)
+  }
+
+  let removed = 0
+  for (const group of groups.values()) {
+    if (group.length < 2) continue
+    const ordered = [...group].sort((a, b) => recordTime(b) - recordTime(a) || Number(a.id || 0) - Number(b.id || 0))
+    const winner = ordered[0]
+    const duplicates = ordered.slice(1).filter(invoice => typeof invoice.id === 'number')
+    if (!winner?.id || !duplicates.length) continue
+
+    await db.invoices.put({ ...winner, id: winner.id, companyId: companyIdOf(winner) })
+    await db.invoices.bulkDelete(duplicates.map(invoice => invoice.id!))
+    removed += duplicates.length
+  }
+  return removed
+}
+
 async function pullInvoices(uid: string) {
   if (!firestore) return
   const snapshots = await getDocs(collection(firestore, 'users', uid, 'invoices'))
   const locals = await db.invoices.toArray()
-  const byKey = new Map(locals.map(invoice => [`${companyIdOf(invoice)}:${invoice.number}`, invoice]))
+  const byKey = new Map(locals.filter(invoice => invoice.number?.trim()).map(invoice => [invoiceLogicalKey(invoice), invoice]))
+
+  const remoteGroups = new Map<string, typeof snapshots.docs>()
   for (const snapshot of snapshots.docs) {
     const remote = snapshot.data() as Invoice
-    if (!remote.number) continue
+    if (!remote.number?.trim()) continue
     const normalized = { ...remote, companyId: companyIdOf(remote) }
-    const key = `${companyIdOf(normalized)}:${normalized.number}`
+    const key = invoiceLogicalKey(normalized)
+    const group = remoteGroups.get(key) || []
+    group.push(snapshot)
+    remoteGroups.set(key, group)
+  }
+
+  for (const [key, group] of remoteGroups) {
+    const winnerSnapshot = [...group].sort((a, b) => recordTime(b.data() as Invoice) - recordTime(a.data() as Invoice))[0]
+    const remote = winnerSnapshot.data() as Invoice
+    const normalized: Invoice = { ...remote, companyId: companyIdOf(remote), id: undefined }
     const local = byKey.get(key)
-    if (!local) { await db.invoices.add({ ...normalized, id: undefined }); continue }
-    const remoteTime = Date.parse(remote.updatedAt || remote.createdAt || '') || 0
-    const localTime = Date.parse(local.updatedAt || local.createdAt || '') || 0
-    if (remoteTime > localTime && local.id) await db.invoices.put({ ...normalized, id: local.id })
+
+    if (!local) {
+      const id = Number(await db.invoices.add(normalized))
+      byKey.set(key, { ...normalized, id })
+    } else if (recordTime(normalized) > recordTime(local) && local.id) {
+      const updated = { ...normalized, id: local.id }
+      await db.invoices.put(updated)
+      byKey.set(key, updated)
+    }
+
+    // Migrate every logical invoice to one deterministic Firestore document.
+    // Older app versions could leave the same invoice under multiple document IDs.
+    const canonicalId = invoiceKey(normalized)
+    await setDoc(doc(firestore, 'users', uid, 'invoices', canonicalId), clean({ ...normalized, id: undefined }), { merge: true })
+    const staleDocs = group.filter(snapshot => snapshot.id !== canonicalId)
+    if (staleDocs.length) {
+      await Promise.all(staleDocs.map(snapshot => deleteDoc(doc(firestore, 'users', uid, 'invoices', snapshot.id))))
+    }
   }
 }
 
@@ -103,7 +156,10 @@ async function pullClients(uid: string) {
     const remote = snapshot.data() as Client
     const companyId = companyIdOf(remote)
     const match = locals.find(client => companyIdOf(client) === companyId && ((remote.taxId && client.taxId === remote.taxId) || (remote.email && client.email === remote.email) || client.name.toLowerCase() === remote.name?.toLowerCase()))
-    if (!match) await db.clients.add({ ...remote, companyId, id: undefined })
+    if (!match) {
+      const id = Number(await db.clients.add({ ...remote, companyId, id: undefined }))
+      locals.push({ ...remote, companyId, id })
+    }
   }
 }
 
@@ -116,7 +172,10 @@ async function pullProducts(uid: string) {
     if (!remote.name) continue
     const companyId = companyIdOf(remote)
     const match = locals.find(product => companyIdOf(product) === companyId && product.name.toLowerCase() === remote.name.toLowerCase())
-    if (!match) await db.products.add({ ...remote, companyId, id: undefined })
+    if (!match) {
+      const id = Number(await db.products.add({ ...remote, companyId, id: undefined }))
+      locals.push({ ...remote, companyId, id })
+    }
   }
 }
 
@@ -130,10 +189,18 @@ async function pullPayments(uid: string) {
     if (!remote.key || !remote.invoiceNumber) continue
     const normalized = { ...remote, companyId: companyIdOf(remote) }
     const local = byKey.get(remote.key)
-    if (!local) { await db.payments.add({ ...normalized, id: undefined }); continue }
-    const remoteTime = Date.parse(remote.updatedAt || remote.createdAt || '') || 0
-    const localTime = Date.parse(local.updatedAt || local.createdAt || '') || 0
-    if (remoteTime > localTime && local.id) await db.payments.put({ ...normalized, id: local.id })
+    if (!local) {
+      const id = Number(await db.payments.add({ ...normalized, id: undefined }))
+      byKey.set(remote.key, { ...normalized, id })
+      continue
+    }
+    const remoteTime = recordTime(remote)
+    const localTime = recordTime(local)
+    if (remoteTime > localTime && local.id) {
+      const updated = { ...normalized, id: local.id }
+      await db.payments.put(updated)
+      byKey.set(remote.key, updated)
+    }
   }
 }
 
@@ -143,6 +210,7 @@ export async function syncFirebaseNow(uid = activeUid || '') {
   applyingRemote = true
   try {
     await Promise.all([pullCompanies(uid), pullInvoices(uid), pullClients(uid), pullProducts(uid), pullPayments(uid)])
+    await dedupeLocalInvoices()
   } finally {
     applyingRemote = false
   }
