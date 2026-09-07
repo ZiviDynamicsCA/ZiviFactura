@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AuthShell from './AuthShell'
+import InstallPrompt from './InstallPrompt'
 import QuickTools from './QuickTools'
 import ZiviChrome from './ZiviChrome'
 import { initAutomaticBackup } from './cloudBackup'
@@ -14,6 +15,7 @@ import './polish-v22.css'
 import './polish-v24.css'
 import './polish-v27.css'
 import './polish-v28.css'
+import './auth-v29.css'
 
 initAutomaticBackup()
 
@@ -22,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <AuthShell />
     <ZiviChrome />
     <QuickTools />
+    <InstallPrompt />
   </React.StrictMode>,
 )
 
