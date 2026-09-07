@@ -1,6 +1,5 @@
-/* ZiviFactura v24 — light brand asset + financial quick-tool icon */
+/* ZiviFactura v26 — robust inline branding, no external image dependencies in the UI */
 
-/* Header brand: remove the old black corporate-image frame and use the approved light ZiviFactura lockup. */
 .ziviInstitutionalLockup{
   flex:1 1 auto!important;
   min-width:0!important;
@@ -21,31 +20,34 @@
   border-radius:15px;
   background:#fff;
 }
-.ziviHeaderBrandAsset img{
+.ziviHeaderLogoSvg{
+  display:block;
   width:100%;
   height:100%;
-  object-fit:contain;
-  object-position:left center;
-  display:block;
 }
 .ziviOfficialLogoFrame,.ziviProductLockup{display:none!important}
 
-/* Tasas: always show the approved money/calculator icon. */
-.quickDock button.tool svg{display:none!important}
-.quickDock button.tool::before{
-  content:"";
-  width:27px;
-  height:27px;
-  border-radius:9px;
-  background:url('/zivifactura-rates-icon.svg?v=2') center/cover no-repeat;
-  box-shadow:0 3px 10px rgba(19,116,188,.10);
-  flex:none;
+/* Tasas: use the native vector icon already rendered by React; never depend on a background image. */
+.quickDock button.tool svg{
+  display:block!important;
+  width:23px!important;
+  height:23px!important;
+  padding:4px!important;
+  box-sizing:content-box!important;
+  border-radius:9px!important;
+  color:#0a79d8!important;
+  background:linear-gradient(145deg,#f8fcff,#e5f6ff)!important;
+  border:1px solid #cdeaff!important;
+  box-shadow:0 3px 10px rgba(19,116,188,.10)!important;
 }
-.quickDock button.tool.active::before{
-  box-shadow:0 4px 14px rgba(14,139,215,.22);
+.quickDock button.tool::before{display:none!important;content:none!important}
+.quickDock button.tool.active svg{
+  color:#075fc0!important;
+  background:linear-gradient(145deg,#e7f8ff,#eaf1ff)!important;
+  box-shadow:0 4px 14px rgba(14,139,215,.18)!important;
 }
 
-/* The contextual price calculator gets an unmistakable financial symbol. */
+/* Contextual price calculator: clear financial action, never an emoji. */
 .inlineCalcButton{
   font-size:0!important;
   font-family:Inter,Arial,sans-serif!important;
@@ -60,9 +62,15 @@
   color:#087fdc;
 }
 
+/* Defensive mobile sizing: branding must never force a wider page. */
+.ziviChrome,.ziviChrome *{box-sizing:border-box}
+.ziviChrome{max-width:100vw!important;overflow:hidden!important}
+.ziviChromeBrand{min-width:0!important;overflow:hidden!important}
+.ziviChromeActions{min-width:0!important}
+
 @media(max-width:760px){
   .ziviHeaderBrandAsset{width:154px;height:50px;border-radius:12px}
-  .quickDock button.tool::before{width:24px;height:24px;border-radius:8px}
+  .quickDock button.tool svg{width:19px!important;height:19px!important;padding:3px!important;border-radius:8px!important}
 }
 
 @media(max-width:420px){
