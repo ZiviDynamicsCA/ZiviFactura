@@ -11,6 +11,7 @@ import './business.css'
 import './zivi-v2.css'
 import './brand-fixes.css'
 import './polish-v22.css'
+import './polish-v24.css'
 
 initAutomaticBackup()
 
