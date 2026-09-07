@@ -10,7 +10,7 @@
   "lang": "es",
   "icons": [
     {
-      "src": "/zivifactura-app-icon-v3.svg",
+      "src": "/zivifactura-app-icon-v3.svg?v=2",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
