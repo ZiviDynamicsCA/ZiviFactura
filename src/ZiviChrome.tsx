@@ -72,7 +72,7 @@ export default function ZiviChrome() {
   return <header className="ziviChrome" aria-label="Cabecera de ZiviFactura">
     <button className="ziviChromeBrand ziviInstitutionalLockup" onClick={() => clickWorkspace(0)} aria-label="Ir al inicio">
       <span className="ziviHeaderBrandAsset" aria-hidden="true">
-        <img src="/zivifactura-header-light.svg?v=1" alt="" />
+        <img src="/zivifactura-header-light.svg?v=2" alt="" />
       </span>
     </button>
 
