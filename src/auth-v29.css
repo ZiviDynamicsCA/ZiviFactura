@@ -1,0 +1,132 @@
+/* ZiviFactura v29 — light authentication aligned with the approved product identity */
+.authScreen{
+  min-height:100vh!important;
+  place-items:start center!important;
+  padding:24px 16px 40px!important;
+  color:#102348!important;
+  background:
+    radial-gradient(circle at 12% 6%,rgba(0,223,245,.16),transparent 28%),
+    radial-gradient(circle at 90% 14%,rgba(123,61,255,.09),transparent 24%),
+    linear-gradient(180deg,#fbfdff 0%,#f2f8ff 55%,#f8fbff 100%)!important;
+}
+.authPanel,.authPanel.signupPanel,.verifyPanel{
+  width:min(100%,620px)!important;
+  margin:0!important;
+  padding:28px!important;
+  border:1px solid #dbe8f5!important;
+  border-radius:28px!important;
+  background:rgba(255,255,255,.96)!important;
+  box-shadow:0 22px 60px rgba(24,70,126,.11)!important;
+  backdrop-filter:blur(20px) saturate(135%)!important;
+  color:#102348!important;
+}
+.authPanel.signupPanel{width:min(100%,820px)!important}
+.authBrand{
+  position:relative!important;
+  display:block!important;
+  width:min(100%,360px)!important;
+  height:96px!important;
+  margin:0 0 18px!important;
+}
+.authBrand>span,.authBrand>div{display:none!important}
+.authBrand::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:url('/zivifactura-header-v28.png?v=29') left center/contain no-repeat;
+}
+.authCopy .eyebrow,.verifyEyebrow{color:#0a91ec!important}
+.authCopy h1,.verifyPanel h1{color:#0b1f3e!important}
+.authCopy p,.verifyPanel>p{color:#65799c!important}
+.authTabs{
+  border:1px solid #dce8f5!important;
+  background:#f4f8fd!important;
+  box-shadow:inset 0 1px 0 #fff!important;
+}
+.authTabs button{color:#667994!important}
+.authTabs button.active{
+  color:#0b1f3e!important;
+  background:#fff!important;
+  border:1px solid #d8e6f4!important;
+  box-shadow:0 8px 20px rgba(23,69,120,.08)!important;
+}
+.authForm label>span,.signupGrid label>span{color:#5f7392!important}
+.authForm input,.authForm select,.authForm textarea,.signupGrid input,.signupGrid select,.signupGrid textarea{
+  border:1px solid #d9e6f3!important;
+  background:#fbfdff!important;
+  color:#142542!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9)!important;
+}
+.authForm input::placeholder,.signupGrid input::placeholder,.signupGrid textarea::placeholder{color:#91a0b6!important}
+.authForm input:focus,.authForm select:focus,.authForm textarea:focus,.signupGrid input:focus,.signupGrid select:focus,.signupGrid textarea:focus{
+  border-color:#7bc9ff!important;
+  box-shadow:0 0 0 3px rgba(0,156,255,.10)!important;
+}
+.passwordField button{color:#6681a4!important}
+.passwordField button:hover{background:#edf7ff!important;color:#087be8!important}
+.primaryAuth{
+  background:linear-gradient(135deg,#00dff5,#079cff 58%,#1267ed)!important;
+  color:#fff!important;
+  box-shadow:0 12px 28px rgba(0,145,235,.22)!important;
+}
+.forgotPassword{color:#0b7fe8!important}
+.forgotPassword:hover{color:#075fbd!important}
+.signupSection strong{color:#163358!important}
+.signupSection small{color:#7b8da8!important}
+.signupOptional{border-color:#dce8f5!important;background:#f8fbff!important}
+.signupOptional summary{color:#244466!important}
+.signupOptional summary span{color:#0b8de9!important;border-color:#bfe5fb!important;background:#eefaff!important}
+.signupConsent,.authLegal{color:#788aa4!important}
+.signupConsent a,.authLegalLinks a{color:#0b78dc!important}
+.authDivider{color:#7c8da7!important}
+.authDivider:before,.authDivider:after{background:#dce7f2!important}
+.googleButton{border-color:#d7e2ee!important;color:#172033!important;box-shadow:0 10px 25px rgba(25,70,120,.08)!important}
+.googleTrust{color:#7285a2!important}
+.googleTrust svg{color:#0ba9df!important}
+.localFallback{color:#587395!important}
+.localFallback:hover{color:#0a78dd!important}
+.authError{border-color:#f7c5cd!important;background:#fff4f6!important;color:#b42339!important}
+.authNotice{border-color:#b9ebd6!important;background:#effbf6!important;color:#087451!important}
+.verifyIcon{background:linear-gradient(145deg,#edf9ff,#f1f5ff)!important;border-color:#cce8f8!important;color:#078be8!important}
+.verifyPanel>p strong{color:#173458!important}
+.verifySecondary{border-color:#d7e5f2!important;background:#f8fbff!important;color:#244466!important}
+.verifySecondary:hover{background:#edf7ff!important}
+.authLoading{background:#f5f9ff!important;color:#173458!important}
+.authSpinner{border-color:#d8e6f2!important;border-top-color:#079cff!important}
+
+.pwaInstallCard{
+  position:fixed;
+  z-index:250;
+  left:50%;
+  bottom:max(18px,env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  width:min(calc(100vw - 28px),560px);
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:10px;
+  padding:10px;
+  border:1px solid #d7e6f4;
+  border-radius:18px;
+  background:rgba(255,255,255,.97);
+  box-shadow:0 18px 50px rgba(22,66,119,.18);
+  backdrop-filter:blur(18px) saturate(140%);
+}
+.pwaInstallCard img{width:46px;height:46px;border-radius:13px;object-fit:contain}
+.pwaInstallCardCopy{min-width:0;display:grid;gap:2px}
+.pwaInstallCardCopy strong{font-size:.86rem;color:#122b4f}
+.pwaInstallCardCopy small{font-size:.67rem;color:#7385a0;line-height:1.25}
+.pwaInstallAction{min-height:38px;padding:0 14px;border:0;border-radius:11px;background:linear-gradient(135deg,#00dff5,#079cff 58%,#1267ed);color:#fff;font-weight:800}
+.pwaInstallClose{width:36px;height:36px;border:0;border-radius:10px;background:#f3f7fb;color:#6e819d;display:grid;place-items:center}
+
+@media(max-width:640px){
+  .authScreen{padding:12px 10px 96px!important}
+  .authPanel,.authPanel.signupPanel,.verifyPanel{padding:20px 16px!important;border-radius:24px!important}
+  .authBrand{height:78px!important;width:min(100%,310px)!important;margin-bottom:12px!important}
+  .compactCopy h1{font-size:2.15rem!important}
+  .authCopy p{font-size:.95rem!important}
+  .pwaInstallCard{grid-template-columns:42px minmax(0,1fr) auto;padding:9px}
+  .pwaInstallCard img{width:42px;height:42px}
+  .pwaInstallClose{display:none}
+  .pwaInstallAction{padding:0 12px}
+}
