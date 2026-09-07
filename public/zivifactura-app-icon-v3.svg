@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ZiviFactura">
+  <defs>
+    <linearGradient id="panel" x1="42" y1="34" x2="468" y2="474" gradientUnits="userSpaceOnUse"><stop stop-color="#ffffff"/><stop offset=".58" stop-color="#f6fbff"/><stop offset="1" stop-color="#eaf6ff"/></linearGradient>
+    <linearGradient id="blue" x1="84" y1="86" x2="390" y2="176" gradientUnits="userSpaceOnUse"><stop stop-color="#00e7ff"/><stop offset=".46" stop-color="#079cff"/><stop offset="1" stop-color="#153fc0"/></linearGradient>
+    <linearGradient id="gold" x1="360" y1="118" x2="146" y2="352" gradientUnits="userSpaceOnUse"><stop stop-color="#ffe876"/><stop offset=".48" stop-color="#ffc20a"/><stop offset="1" stop-color="#ff9800"/></linearGradient>
+    <linearGradient id="pink" x1="138" y1="332" x2="404" y2="418" gradientUnits="userSpaceOnUse"><stop stop-color="#7d19b9"/><stop offset=".4" stop-color="#d90aa8"/><stop offset="1" stop-color="#ff2995"/></linearGradient>
+    <linearGradient id="dollar" x1="370" y1="318" x2="421" y2="374"><stop stop-color="#00c9ff"/><stop offset="1" stop-color="#1766ea"/></linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="15" stdDeviation="17" flood-color="#0d4da1" flood-opacity=".18"/></filter>
+    <filter id="cardShadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#2f72bc" flood-opacity=".15"/></filter>
+  </defs>
+  <rect x="18" y="18" width="476" height="476" rx="118" fill="url(#panel)" stroke="#d6ecff" stroke-width="5"/>
+  <path d="M52 415C129 470 278 494 455 447" fill="none" stroke="#8bdcff" stroke-width="38" opacity=".12" stroke-linecap="round"/>
+  <path d="M57 103C177 35 353 43 464 154" fill="none" stroke="#c6efff" stroke-width="54" opacity=".16" stroke-linecap="round"/>
+  <g filter="url(#shadow)">
+    <path d="M91 126C146 73 243 65 333 91c51 15 84 42 91 74-47-21-103-23-162-5-52 16-101 26-142 14-28-8-50-25-67-49 11 8 24 9 38 1Z" fill="url(#blue)"/>
+    <path d="M352 123c45 28 54 69 28 111-31 50-84 77-132 101-47 24-78 47-83 82-25-20-39-48-31-76 10-39 49-68 109-101 59-33 97-66 109-117Z" fill="url(#gold)"/>
+    <path d="M166 345c28 16 62 17 100 5 56-18 110-12 157 27-11 30-33 53-66 67-49-26-94-31-135-16-43 15-80 8-108-21-18-19-25-42-22-69 19 9 43 11 74 7Z" fill="url(#pink)"/>
+    <path d="M104 122c48 31 96 34 143 17 34-12 71-15 111-9" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" opacity=".45"/>
+    <path d="M343 128c25 39 11 76-41 112" fill="none" stroke="#fff5bc" stroke-width="7" stroke-linecap="round" opacity=".58"/>
+    <path d="M151 349c36 20 74 20 113 7 48-16 91-8 132 19" fill="none" stroke="#ffb5e2" stroke-width="7" stroke-linecap="round" opacity=".48"/>
+  </g>
+  <g filter="url(#cardShadow)">
+    <rect x="329" y="257" width="112" height="137" rx="26" fill="#f8fbff" stroke="#bfddf7" stroke-width="5"/>
+    <path d="M405 257v31c0 8 6 14 14 14h22" fill="#dcefff" stroke="#bfddf7" stroke-width="4"/>
+    <path d="M351 301h54M351 329h43M351 357h31" stroke="#658fbe" stroke-width="10" stroke-linecap="round"/>
+    <text x="393" y="373" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="58" font-weight="800" fill="url(#dollar)">$</text>
+  </g>
+</svg>
