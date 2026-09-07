@@ -1,0 +1,159 @@
+/* ZiviFactura v27 — final responsive brand header hierarchy */
+
+body.zivi-v2-active #root{padding-top:82px!important}
+
+.ziviChrome{
+  height:82px!important;
+  padding:9px max(14px,calc((100vw - 1440px)/2 + 22px))!important;
+  gap:12px!important;
+  overflow:visible!important;
+  background:rgba(255,255,255,.96)!important;
+  border-bottom:1px solid rgba(205,222,240,.9)!important;
+  box-shadow:0 8px 28px rgba(20,61,110,.07)!important;
+}
+
+.ziviInstitutionalLockup{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  max-width:390px!important;
+  height:62px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:11px!important;
+  padding:0 3px!important;
+  overflow:visible!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+.ziviHeaderBrandAsset,.ziviHeaderLogoSvg,.ziviOfficialLogoFrame,.ziviProductLockup{display:none!important}
+
+.ziviBrandMark{
+  width:56px;
+  height:56px;
+  flex:0 0 56px;
+  display:grid;
+  place-items:center;
+  border-radius:17px;
+  background:linear-gradient(145deg,#ffffff,#f1f9ff);
+  border:1px solid rgba(202,225,245,.85);
+  box-shadow:0 8px 22px rgba(0,143,255,.12);
+  overflow:hidden;
+}
+.ziviRibbonMark{width:52px;height:52px;display:block;overflow:visible}
+
+.ziviBrandCopy{
+  min-width:0;
+  display:grid;
+  align-content:center;
+  line-height:1;
+}
+.ziviBrandCopy strong{
+  display:block!important;
+  margin:0!important;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  font-size:1.38rem!important;
+  line-height:1.02!important;
+  font-weight:850!important;
+  letter-spacing:-.055em!important;
+  color:#132b55!important;
+  white-space:nowrap!important;
+}
+.ziviBrandCopy strong>span{
+  background:linear-gradient(90deg,#079cff 0%,#1167dd 66%,#7b3dff 100%)!important;
+  -webkit-background-clip:text!important;
+  background-clip:text!important;
+  color:transparent!important;
+}
+.ziviBrandCopy small{
+  display:block!important;
+  margin-top:6px!important;
+  font-size:.67rem!important;
+  line-height:1!important;
+  font-weight:650!important;
+  letter-spacing:.015em!important;
+  color:#7284a4!important;
+  white-space:nowrap!important;
+}
+
+.ziviChromeActions{flex:0 0 auto!important;gap:7px!important}
+.ziviChromeBell{width:42px!important;height:42px!important;flex:0 0 42px!important}
+.ziviBusinessSelect{
+  min-width:174px!important;
+  max-width:230px!important;
+  height:54px!important;
+  border-radius:16px!important;
+  padding-left:12px!important;
+  padding-right:30px!important;
+}
+.ziviBusinessSelect strong{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  display:-webkit-box!important;
+  -webkit-line-clamp:2!important;
+  -webkit-box-orient:vertical!important;
+  line-height:1.05!important;
+}
+
+@media(max-width:760px){
+  body.zivi-v2-active #root{padding-top:78px!important}
+  .ziviChrome{
+    height:78px!important;
+    padding:8px 10px!important;
+    gap:7px!important;
+  }
+  .ziviInstitutionalLockup{
+    max-width:none!important;
+    height:56px!important;
+    gap:7px!important;
+    padding:0!important;
+  }
+  .ziviBrandMark{
+    width:49px;
+    height:49px;
+    flex-basis:49px;
+    border-radius:14px;
+  }
+  .ziviRibbonMark{width:46px;height:46px}
+  .ziviBrandCopy strong{font-size:1.08rem!important;letter-spacing:-.05em!important}
+  .ziviBrandCopy small{font-size:.54rem!important;margin-top:5px!important}
+  .ziviChromeActions{gap:4px!important}
+  .ziviChromeBell{width:36px!important;height:36px!important;flex-basis:36px!important;border-radius:11px!important}
+  .ziviBusinessSelect{
+    width:128px!important;
+    min-width:128px!important;
+    max-width:128px!important;
+    height:50px!important;
+    padding:0 18px 0 8px!important;
+    border-radius:13px!important;
+  }
+  .ziviBusinessSelect>svg:not(.ziviBusinessChevron){display:none!important}
+  .ziviBusinessSelect small{font-size:.44rem!important;letter-spacing:.05em!important}
+  .ziviBusinessSelect strong{font-size:.65rem!important;line-height:1.04!important;margin-top:3px!important}
+  .ziviBusinessChevron{right:5px!important;width:12px!important;height:12px!important}
+  .ziviAddBusiness,.ziviLogout{display:none!important}
+}
+
+@media(max-width:420px){
+  .ziviChrome{padding-left:8px!important;padding-right:8px!important;gap:5px!important}
+  .ziviInstitutionalLockup{gap:5px!important}
+  .ziviBrandMark{width:45px;height:45px;flex-basis:45px;border-radius:13px}
+  .ziviRibbonMark{width:43px;height:43px}
+  .ziviBrandCopy strong{font-size:.95rem!important}
+  .ziviBrandCopy small{font-size:.48rem!important;margin-top:4px!important}
+  .ziviChromeBell{width:34px!important;height:34px!important;flex-basis:34px!important}
+  .ziviBusinessSelect{width:116px!important;min-width:116px!important;max-width:116px!important;height:48px!important}
+  .ziviBusinessSelect strong{font-size:.61rem!important}
+}
+
+@media(max-width:370px){
+  .ziviBrandMark{width:41px;height:41px;flex-basis:41px}
+  .ziviRibbonMark{width:39px;height:39px}
+  .ziviBrandCopy strong{font-size:.86rem!important}
+  .ziviBrandCopy small{font-size:.43rem!important}
+  .ziviBusinessSelect{width:104px!important;min-width:104px!important;max-width:104px!important}
+  .ziviBusinessSelect strong{font-size:.57rem!important}
+}
