@@ -30,14 +30,14 @@
 }
 .ziviOfficialLogoFrame,.ziviProductLockup{display:none!important}
 
-/* Tasas: always show a clear money/calculator symbol instead of the empty-looking generic icon. */
+/* Tasas: always show the approved money/calculator icon. */
 .quickDock button.tool svg{display:none!important}
 .quickDock button.tool::before{
   content:"";
   width:27px;
   height:27px;
   border-radius:9px;
-  background:url('/zivifactura-rates-icon.svg?v=1') center/cover no-repeat;
+  background:url('/zivifactura-rates-icon.svg?v=2') center/cover no-repeat;
   box-shadow:0 3px 10px rgba(19,116,188,.10);
   flex:none;
 }
