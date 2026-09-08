@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="theme-color" content="#f7fbff"/>
+  <title>Inscripción | ZiviFactura</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#102746;background:linear-gradient(180deg,#fbfdff,#f2f8ff)}button,input,textarea,select{font:inherit}.hero{padding:22px 16px 74px;background:radial-gradient(circle at 18% 0,rgba(0,220,244,.22),transparent 34%),radial-gradient(circle at 92% 25%,rgba(255,45,155,.08),transparent 28%),linear-gradient(135deg,#fff,#edf8ff);border-bottom:1px solid #d9e9f6}.hero>div,.wrap{width:min(100%,760px);margin:auto}.brand{display:flex;align-items:center;gap:10px}.brand img{width:150px;max-width:45vw}.brand span{margin-left:auto;font-size:.68rem;font-weight:800;color:#5980a4;background:#fff;border:1px solid #d8e7f4;border-radius:999px;padding:7px 10px}.hero h1{font-size:clamp(2rem,7vw,3.3rem);letter-spacing:-.055em;line-height:1;margin:28px 0 10px;color:#0e2850}.hero p{margin:0;color:#657d9d;line-height:1.6;max-width:650px}.wrap{margin-top:-50px;padding:0 12px 46px}.card{background:#fff;border:1px solid #dce8f4;border-radius:22px;box-shadow:0 18px 50px rgba(22,64,116,.08);padding:18px;margin-bottom:12px}.intro{display:grid;gap:4px}.intro span{font-size:.65rem;color:#0b8ae9;font-weight:850;letter-spacing:.13em}.intro strong{font-size:1.08rem;color:#163152}.intro small{color:#7a8aa1}.fields{display:grid;gap:11px}.section{padding:14px 14px 10px;border-radius:15px;background:linear-gradient(135deg,#eaf8ff,#f4f6ff);border:1px solid #d5e7f5;color:#145483;font-size:.82rem;font-weight:850}.field{display:grid;gap:6px}.field>span{font-size:.75rem;font-weight:780;color:#506681;line-height:1.4}.required:after{content:" *";color:#e53b86}.field input,.field textarea,.field select{width:100%;border:1px solid #d8e5f2;border-radius:13px;background:#fbfdff;color:#183450;padding:11px 12px;min-height:46px;outline:none}.field textarea{min-height:100px;resize:vertical}.field input:focus,.field textarea:focus,.field select:focus{border-color:#7fc7f5;box-shadow:0 0 0 3px rgba(0,149,240,.10);background:#fff}.choices{display:grid;gap:8px}.choice{display:flex;align-items:center;gap:8px;padding:10px 11px;border:1px solid #dfe9f3;border-radius:12px;background:#fbfdff;color:#334f6b;font-size:.8rem}.choice input{width:auto;min-height:0;padding:0}.submit{width:100%;min-height:54px;border:0;border-radius:15px;background:linear-gradient(135deg,#08d2e7,#078cf2 58%,#1a66e8);color:#fff;font-weight:850;box-shadow:0 12px 26px rgba(0,139,233,.2);cursor:pointer}.submit:disabled{opacity:.55}.note{font-size:.72rem;line-height:1.5;color:#7c8ca2;text-align:center}.message{display:none;border-radius:14px;padding:13px 14px;font-size:.8rem;line-height:1.5}.message.ok{display:block;background:#ecfdf5;border:1px solid #bbf7d0;color:#166534}.message.bad{display:block;background:#fff1f4;border:1px solid #fecdd3;color:#9f1239}.success{display:none;text-align:center;padding:36px 18px}.success.show{display:block}.successIcon{width:66px;height:66px;border-radius:22px;background:#e9fbf5;color:#0d9c70;display:grid;place-items:center;font-size:30px;margin:0 auto 14px}.success h2{margin:0;color:#123153}.success p{color:#667e9e;line-height:1.6}.footer{text-align:center;color:#8290a5;font-size:.68rem;padding-top:8px}.footer a{color:#0b80e4;text-decoration:none}.loading{width:min(100%,680px);margin:50px auto;padding:20px;text-align:center;color:#6a7e9a}.error{display:none;width:min(100%,700px);margin:40px auto;padding:18px;border-radius:16px;background:#fff1f4;border:1px solid #fecdd3;color:#9f1239}.error.show{display:block}@media(max-width:560px){.card{padding:15px;border-radius:18px}.hero{padding-bottom:68px}.brand img{width:132px}.brand span{font-size:.6rem}}
+  </style>
+</head>
+<body>
+  <header class="hero"><div><div class="brand"><img src="/zivifactura-header-v28.png" alt="ZiviFactura"/><span>Inscripción segura</span></div><h1 id="formTitle">Planilla de inscripción</h1><p id="formDescription">Cargando información…</p></div></header>
+  <main class="wrap">
+    <div id="loading" class="loading">Preparando la planilla…</div>
+    <div id="error" class="error">No pudimos abrir esta planilla. Solicita al centro un enlace actualizado.</div>
+    <section id="content" hidden>
+      <article class="card intro"><span>FORMULARIO DEL CENTRO</span><strong id="companyName"></strong><small id="companyMeta"></small></article>
+      <form id="form" class="card fields"></form>
+      <article id="submitCard" class="card"><div id="message" class="message"></div><button id="submit" class="submit" type="button">Enviar inscripción</button><p class="note">Revisa tus respuestas antes de enviar. La información será recibida por el negocio que compartió este enlace y quedará pendiente de revisión.</p></article>
+      <article id="success" class="card success"><div class="successIcon">✓</div><h2>Inscripción enviada</h2><p>La información fue recibida correctamente. El centro podrá revisarla desde ZiviFactura y contactarte para continuar el proceso.</p></article>
+      <p class="footer">Formulario gestionado con ZiviFactura · <a href="https://zividynamics.com" target="_blank" rel="noreferrer">Zivi Dynamics C.A.</a></p>
+    </section>
+  </main>
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js'
+  import { initializeAuth, inMemoryPersistence, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js'
+  import { collection, doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js'
+
+  const firebaseConfig={apiKey:'AIzaSyBuuntT-Bpk_-tlKslOG5a2UeqPenCQ6uk',authDomain:'zivifactura.firebaseapp.com',projectId:'zivifactura',messagingSenderId:'276549383437',appId:'1:276549383437:web:212612caed5710d9ddec44'}
+  const app=initializeApp(firebaseConfig),db=getFirestore(app)
+  let auth,formData
+  const $=id=>document.getElementById(id)
+  const formId=new URLSearchParams(location.search).get('id')||''
+  const makeId=()=>crypto.randomUUID?crypto.randomUUID().replace(/-/g,''):`${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
+
+  function showError(message){$('loading').hidden=true;$('error').textContent=message||'No pudimos abrir esta planilla.';$('error').classList.add('show')}
+  function label(field){const span=document.createElement('span');span.textContent=field.label||'Pregunta';if(field.required)span.className='required';return span}
+  function renderField(field){
+    if(field.type==='section'){const el=document.createElement('div');el.className='section';el.textContent=field.label||'Sección';return el}
+    const wrap=document.createElement('label');wrap.className='field';wrap.dataset.key=field.key||field.id;wrap.append(label(field))
+    let input
+    if(field.type==='textarea'){input=document.createElement('textarea');input.rows=4}
+    else if(field.type==='select'){input=document.createElement('select');const empty=document.createElement('option');empty.value='';empty.textContent='Seleccionar…';input.append(empty);(field.options||[]).forEach(value=>{const option=document.createElement('option');option.value=value;option.textContent=value;input.append(option)})}
+    else if(field.type==='radio'){
+      const choices=document.createElement('div');choices.className='choices';(field.options||['Sí','No']).forEach(value=>{const row=document.createElement('label');row.className='choice';const radio=document.createElement('input');radio.type='radio';radio.name=field.key||field.id;radio.value=value;radio.required=!!field.required;row.append(radio,document.createTextNode(value));choices.append(row)});wrap.append(choices);return wrap
+    } else {input=document.createElement('input');input.type=field.type==='email'?'email':field.type==='phone'?'tel':field.type==='date'?'date':'text'}
+    input.name=field.key||field.id;input.required=!!field.required;if(field.placeholder)input.placeholder=field.placeholder;wrap.append(input);return wrap
+  }
+
+  function answers(){
+    const result={}
+    ;(formData.fields||[]).forEach(field=>{
+      if(field.type==='section')return
+      const key=field.key||field.id
+      if(field.type==='radio'){result[key]=document.querySelector(`input[name="${CSS.escape(key)}"]:checked`)?.value||''}
+      else result[key]=document.querySelector(`[name="${CSS.escape(key)}"]`)?.value?.trim?.()||''
+    })
+    return result
+  }
+
+  function validate(){
+    let ok=true
+    ;(formData.fields||[]).forEach(field=>{
+      if(field.type==='section'||!field.required)return
+      const key=field.key||field.id
+      const value=field.type==='radio'?document.querySelector(`input[name="${CSS.escape(key)}"]:checked`)?.value:document.querySelector(`[name="${CSS.escape(key)}"]`)?.value
+      if(!String(value||'').trim())ok=false
+    })
+    if(!ok){$('message').className='message bad';$('message').textContent='Completa todos los campos obligatorios antes de enviar.'}
+    return ok
+  }
+
+  async function ensureAnonymous(){
+    if(!auth)auth=initializeAuth(app,{persistence:inMemoryPersistence})
+    if(!auth.currentUser)await signInAnonymously(auth)
+    return auth.currentUser
+  }
+
+  async function submit(){
+    if(!validate())return
+    const button=$('submit');button.disabled=true;$('message').className='message';$('message').textContent=''
+    try{
+      const user=await ensureAnonymous();const data=answers();const id=makeId();
+      await setDoc(doc(collection(db,'publicForms',formId,'submissions'),id),{
+        version:1,formId,formKey:formData.formKey||'',companyId:Number(formData.companyId)||1,ownerUid:formData.ownerUid,anonymousUid:user.uid,
+        answers:data,respondentName:data.studentName||data.representativeNameId||'',respondentEmail:data.email||'',status:'received',submittedAt:new Date().toISOString(),createdAt:serverTimestamp()
+      })
+      $('form').hidden=true;$('submitCard').hidden=true;$('success').classList.add('show');window.scrollTo({top:0,behavior:'smooth'})
+    }catch(error){
+      console.error(error);$('message').className='message bad';$('message').textContent=(error?.code||'').includes('permission-denied')?'El formulario está publicado, pero Firebase todavía no permite recibir respuestas. Informa al centro para que actualice los permisos de la planilla.':'No se pudo enviar la inscripción. Verifica tu conexión e inténtalo nuevamente.';button.disabled=false
+    }
+  }
+
+  async function init(){
+    if(!formId)return showError('El enlace de inscripción está incompleto.')
+    try{
+      const snap=await getDoc(doc(db,'publicForms',formId));if(!snap.exists())return showError('Esta planilla no existe o el enlace ya no es válido.')
+      formData=snap.data();if(formData.active!==true)return showError('Esta planilla se encuentra pausada. Solicita un enlace actualizado al centro.')
+      $('formTitle').textContent=formData.title||'Planilla de inscripción';$('formDescription').textContent=formData.description||'Completa la información solicitada.';$('companyName').textContent=formData.company?.name||'Centro educativo';$('companyMeta').textContent=[formData.company?.city,formData.company?.phone,formData.company?.email].filter(Boolean).join(' · ')
+      const form=$('form');(formData.fields||[]).forEach(field=>form.append(renderField(field)));$('loading').hidden=true;$('content').hidden=false;$('submit').addEventListener('click',submit)
+    }catch(error){console.error(error);showError('No pudimos cargar esta planilla. Verifica el enlace o inténtalo nuevamente.')}
+  }
+  void init()
+</script>
+</body>
+</html>
