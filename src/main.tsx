@@ -1,7 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AuthShell from './AuthShell'
+import EducationModule from './EducationModule'
+import HelpCenter from './HelpCenter'
 import InstallPrompt from './InstallPrompt'
+import ModuleBridge from './ModuleBridge'
 import QuickTools from './QuickTools'
 import ZiviChrome from './ZiviChrome'
 import { initAutomaticBackup } from './cloudBackup'
@@ -55,6 +58,9 @@ async function bootstrap() {
       <AuthShell />
       <ZiviChrome />
       <QuickTools />
+      <ModuleBridge />
+      <EducationModule />
+      <HelpCenter />
       <InstallPrompt />
     </React.StrictMode>,
   )
