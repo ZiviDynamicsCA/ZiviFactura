@@ -72,6 +72,7 @@ export interface InvoiceItem {
 export interface Invoice {
   id?: number
   companyId?: number
+  logicalKey?: string
   publicShareId?: string
   number: string
   type: InvoiceType
