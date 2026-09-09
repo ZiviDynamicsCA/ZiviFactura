@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#F8FBFF" />
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="/zivifactura-app-v28.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest?v=34" />
+  <link rel="icon" href="/zivifactura-app-v28.png?v=34" type="image/png" />
   <title>Diagnóstico PWA | ZiviFactura</title>
   <style>
     *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f5f9ff;color:#102348}.wrap{width:min(100%,720px);margin:auto;padding:24px 14px 44px}.card{background:#fff;border:1px solid #dce8f5;border-radius:20px;padding:18px;margin-bottom:12px;box-shadow:0 12px 34px rgba(25,71,127,.07)}h1{margin:0 0 7px;font-size:1.65rem}p{color:#66799a;line-height:1.5}.row{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid #edf3f9}.row:first-child{border-top:0}.row strong{font-size:.9rem}.row span{text-align:right;font-size:.82rem;font-weight:800}.ok{color:#087a52}.bad{color:#b42318}.wait{color:#9a6700}.buttons{display:grid;gap:9px}.buttons button,.buttons a{min-height:48px;border-radius:14px;border:0;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:850}.primary{background:linear-gradient(135deg,#00dff5,#079cff 58%,#1267ed);color:#fff}.secondary{background:#eef6ff;color:#126bd9;border:1px solid #d4e8fa!important}.small{font-size:.75rem;color:#7a8ca7}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f7faff;border:1px solid #e1ebf5;border-radius:12px;padding:10px;font-size:.72rem;overflow-wrap:anywhere}
@@ -13,13 +13,13 @@
 </head>
 <body>
 <main class="wrap">
-  <section class="card"><h1>Diagnóstico de instalación</h1><p>Esta pantalla comprueba los requisitos técnicos que Chrome necesita para instalar ZiviFactura como PWA.</p></section>
+  <section class="card"><h1>Diagnóstico de instalación</h1><p>Esta pantalla comprueba las dos rutas de instalación disponibles en Chromium: el flujo clásico <code>beforeinstallprompt</code> y la nueva Web Install API.</p></section>
   <section class="card" id="checks"></section>
   <section class="card buttons">
     <button id="install" class="primary" disabled>Instalar ZiviFactura</button>
     <button id="refresh" class="secondary">Volver a comprobar</button>
     <a class="secondary" href="/">Volver a ZiviFactura</a>
-    <p class="small">Chrome también aplica una heurística de interacción: toca la página y mantenla abierta al menos 30 segundos antes de volver a comprobar.</p>
+    <p class="small">Si Chrome no emite <code>beforeinstallprompt</code> pero expone <code>navigator.install()</code>, este botón usará directamente la nueva API de instalación web.</p>
   </section>
   <section class="card"><strong>Detalle técnico</strong><div id="detail" class="code">Preparando…</div></section>
 </main>
@@ -29,12 +29,27 @@
   const checks=document.getElementById('checks'),detail=document.getElementById('detail'),install=document.getElementById('install')
   const add=(name,value,state='wait')=>rows.push({name,value,state})
   const render=()=>{checks.innerHTML=rows.map(r=>`<div class="row"><strong>${r.name}</strong><span class="${r.state}">${r.value}</span></div>`).join('')}
+  const webInstallSupported=()=>typeof navigator.install==='function'
+
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;install.disabled=false;void run()})
   window.addEventListener('appinstalled',()=>{deferredPrompt=null;install.disabled=true;void run()})
-  install.addEventListener('click',async()=>{if(!deferredPrompt)return;await deferredPrompt.prompt();await deferredPrompt.userChoice.catch(()=>null);deferredPrompt=null;install.disabled=true;void run()})
+
+  install.addEventListener('click',async()=>{
+    try{
+      if(deferredPrompt){
+        await deferredPrompt.prompt();await deferredPrompt.userChoice.catch(()=>null);deferredPrompt=null
+      }else if(webInstallSupported()){
+        await navigator.install()
+      }
+    }catch(e){
+      alert(`No se pudo iniciar la instalación: ${e?.message||e}`)
+    }
+    void run()
+  })
+
   document.getElementById('refresh').addEventListener('click',()=>void run())
 
-  async function imageSize(src){return new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(`${img.naturalWidth}×${img.naturalHeight}`);img.onerror=()=>resolve('ERROR');img.src=`${src}?check=${Date.now()}`})}
+  async function imageSize(src){return new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(`${img.naturalWidth}×${img.naturalHeight}`);img.onerror=()=>resolve('ERROR');img.src=`${src}${src.includes('?')?'&':'?'}check=${Date.now()}`})}
 
   async function run(){
     rows.length=0
@@ -50,11 +65,13 @@
     add('Scope del Worker',scope,scope.includes(location.origin)?'ok':'wait')
     add('Página controlada por Worker',controlled?'Sí':'Aún no',controlled?'ok':'wait')
 
+    let manifestData=null, manifestType='—'
     try{
-      const res=await fetch(`/manifest.webmanifest?check=${Date.now()}`,{cache:'no-store'});const data=await res.json();
+      const res=await fetch(`/manifest.webmanifest?check=${Date.now()}`,{cache:'no-store'});const data=await res.json();manifestData=data;manifestType=res.headers.get('content-type')
       const validDisplay=['standalone','fullscreen','minimal-ui','window-controls-overlay'].includes(data.display)
       add('Manifest',res.ok?'Disponible':'Error HTTP',res.ok?'ok':'bad')
       add('Nombre',data.name||data.short_name||'Falta',data.name||data.short_name?'ok':'bad')
+      add('Manifest id',data.id||'Falta',data.id?'ok':'bad')
       add('start_url',data.start_url||'Falta',data.start_url?'ok':'bad')
       add('display',data.display||'Falta',validDisplay?'ok':'bad')
       const i192=(data.icons||[]).find(i=>String(i.sizes).includes('192x192'))
@@ -62,13 +79,16 @@
       const s192=i192?await imageSize(i192.src):'Falta',s512=i512?await imageSize(i512.src):'Falta'
       add('Icono 192×192',s192,s192==='192×192'?'ok':'bad')
       add('Icono 512×512',s512,s512==='512×512'?'ok':'bad')
-      detail.textContent=JSON.stringify({manifest:data,manifestContentType:res.headers.get('content-type'),serviceWorker:{sw,scope,controlled},beforeinstallprompt:Boolean(deferredPrompt),standalone:matchMedia('(display-mode: standalone)').matches},null,2)
-    }catch(e){add('Manifest',`ERROR: ${e?.message||e}`,'bad');detail.textContent=String(e?.stack||e)}
+    }catch(e){add('Manifest',`ERROR: ${e?.message||e}`,'bad')}
 
     const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true
+    const newApi=webInstallSupported()
     add('Ya instalada',standalone?'Sí':'No',standalone?'ok':'wait')
-    add('Chrome habilitó instalación',deferredPrompt?'Sí':'Todavía no',deferredPrompt?'ok':'wait')
-    install.disabled=!deferredPrompt
+    add('beforeinstallprompt',deferredPrompt?'Sí':'No',deferredPrompt?'ok':'wait')
+    add('Web Install API',newApi?'Disponible':'No disponible',newApi?'ok':'wait')
+    add('Ruta de instalación',deferredPrompt?'PWA clásica':newApi?'navigator.install()':'Bloqueada por navegador',deferredPrompt||newApi?'ok':'bad')
+    install.disabled=!(deferredPrompt||newApi)
+    detail.textContent=JSON.stringify({manifest:manifestData,manifestContentType:manifestType,serviceWorker:{sw,scope,controlled},beforeinstallprompt:Boolean(deferredPrompt),webInstallApi:newApi,htmlInstallElement:'HTMLInstallElement' in window,standalone,userAgent:navigator.userAgent},null,2)
     render()
   }
   void run()
