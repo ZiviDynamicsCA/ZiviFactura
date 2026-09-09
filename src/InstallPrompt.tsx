@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Download, ExternalLink, X } from 'lucide-react'
+import { createElement, useEffect, useState } from 'react'
+import { Download, X } from 'lucide-react'
 
 type InstallChoice = { outcome: 'accepted' | 'dismissed'; platform: string }
 type InstallPromptEvent = Event & {
@@ -11,8 +11,6 @@ type WebInstallNavigator = Navigator & {
 }
 type PwaWindow = Window & { __ziviInstallPrompt?: InstallPromptEvent | null }
 
-const ANDROID_INSTALLER_URL = 'https://github.com/waldjos/ZiviFactura/releases/download/android-installer-v1/ZiviFactura-Android.apk'
-
 function isStandalone() {
   const navigatorStandalone = Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
   return navigatorStandalone || window.matchMedia('(display-mode: standalone)').matches
@@ -22,9 +20,8 @@ export default function InstallPrompt() {
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(() => (window as PwaWindow).__ziviInstallPrompt || null)
   const [dismissed, setDismissed] = useState(false)
   const [installed, setInstalled] = useState(() => isStandalone())
-  const [fallbackReady, setFallbackReady] = useState(false)
-  const isAndroid = useMemo(() => /Android/i.test(navigator.userAgent), [])
   const webInstallSupported = typeof (navigator as WebInstallNavigator).install === 'function'
+  const installElementSupported = 'HTMLInstallElement' in window
 
   useEffect(() => {
     const syncPrompt = () => setPromptEvent((window as PwaWindow).__ziviInstallPrompt || null)
@@ -37,14 +34,12 @@ export default function InstallPrompt() {
       setPromptEvent(null)
     }
 
-    const fallbackTimer = window.setTimeout(() => setFallbackReady(true), 6500)
     syncPrompt()
     window.addEventListener('beforeinstallprompt', onPrompt)
     window.addEventListener('zivi-install-ready', syncPrompt)
     window.addEventListener('appinstalled', onInstalled)
     window.addEventListener('zivi-installed', onInstalled)
     return () => {
-      window.clearTimeout(fallbackTimer)
       window.removeEventListener('beforeinstallprompt', onPrompt)
       window.removeEventListener('zivi-install-ready', syncPrompt)
       window.removeEventListener('appinstalled', onInstalled)
@@ -77,18 +72,18 @@ export default function InstallPrompt() {
   }
 
   if (installed || dismissed) return null
-  if (!promptEvent && !webInstallSupported && !(isAndroid && fallbackReady)) return null
+  if (!promptEvent && !webInstallSupported && !installElementSupported) return null
 
-  const mode = promptEvent ? 'legacy-pwa' : webInstallSupported ? 'web-install-api' : 'android-fallback'
+  const mode = promptEvent ? 'legacy-pwa' : webInstallSupported ? 'web-install-api' : 'install-element'
 
   return <aside className="pwaInstallCard" aria-label="Instalar ZiviFactura">
     <img src="/zivifactura-app-v28.png?v=34" alt="" aria-hidden="true" />
     <span className="pwaInstallCardCopy">
-      <strong>{mode === 'android-fallback' ? 'Instalar ZiviFactura en Android' : 'Instalar ZiviFactura'}</strong>
+      <strong>Instalar ZiviFactura</strong>
       <small>
         {mode === 'legacy-pwa' && 'Chrome habilitó la instalación PWA nativa.'}
-        {mode === 'web-install-api' && 'Tu navegador admite la nueva API de instalación web. Instala ZiviFactura directamente como aplicación.'}
-        {mode === 'android-fallback' && 'Chrome no habilitó WebAPK en este equipo. Usa el instalador Android de ZiviFactura: abre la misma aplicación web en modo app independiente.'}
+        {mode === 'web-install-api' && 'Tu navegador admite la nueva Web Install API y puede instalar ZiviFactura directamente.'}
+        {mode === 'install-element' && 'Tu navegador admite el nuevo control seguro de instalación web de Chromium.'}
       </small>
     </span>
 
@@ -104,11 +99,7 @@ export default function InstallPrompt() {
       </button>
     )}
 
-    {mode === 'android-fallback' && (
-      <a className="pwaInstallAction" href={ANDROID_INSTALLER_URL} target="_blank" rel="noreferrer">
-        <ExternalLink size={16}/> Descargar instalador
-      </a>
-    )}
+    {mode === 'install-element' && createElement('install', { className: 'pwaInstallAction' }, 'Instalar app')}
 
     <button className="pwaInstallClose" type="button" aria-label="Cerrar" onClick={() => setDismissed(true)}><X size={17}/></button>
   </aside>
