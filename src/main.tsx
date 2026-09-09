@@ -33,10 +33,9 @@ type PwaWindow = Window & {
 }
 
 const pwaWindow = window as PwaWindow
+const PWA_RESET_KEY = 'zivifactura.pwa-reset-v32'
 
 window.addEventListener('beforeinstallprompt', (event) => {
-  // Guardamos el evento para el botón propio de instalación. Chrome solo emite
-  // este evento cuando la aplicación ya cumple sus criterios de instalación.
   event.preventDefault()
   pwaWindow.__ziviInstallPrompt = event as DeferredInstallPrompt
   window.dispatchEvent(new Event('zivi-install-ready'))
@@ -47,6 +46,35 @@ window.addEventListener('appinstalled', () => {
   window.dispatchEvent(new Event('zivi-installed'))
 })
 
+async function resetLegacyPwaOnce() {
+  if (!('serviceWorker' in navigator)) return
+  if (localStorage.getItem(PWA_RESET_KEY) === '1') return
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    await Promise.all(
+      registrations
+        .filter(registration => registration.scope.startsWith(window.location.origin))
+        .map(registration => registration.unregister()),
+    )
+
+    if ('caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(
+        keys
+          .filter(key => /workbox|precache|zivifactura/i.test(key))
+          .map(key => caches.delete(key)),
+      )
+    }
+  } catch (error) {
+    console.warn('[ZiviFactura] legacy PWA cleanup:', error)
+  } finally {
+    // Este marcador solo afecta Service Workers y Cache Storage. No se toca
+    // IndexedDB ni los datos locales de facturas, clientes o cobros.
+    localStorage.setItem(PWA_RESET_KEY, '1')
+  }
+}
+
 async function registerPwaServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     pwaWindow.__ziviSwReady = false
@@ -56,13 +84,13 @@ async function registerPwaServiceWorker() {
   }
 
   try {
+    await resetLegacyPwaOnce()
+
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
       updateViaCache: 'none',
     })
 
-    // Fuerza a Chrome a comprobar la versión recién desplegada en vez de
-    // conservar indefinidamente un worker antiguo de las pruebas anteriores.
     await registration.update().catch(() => undefined)
     await navigator.serviceWorker.ready
 
