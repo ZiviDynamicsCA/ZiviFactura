@@ -6,6 +6,9 @@ type InstallPromptEvent = Event & {
   prompt: () => Promise<void>
   userChoice: Promise<InstallChoice>
 }
+type WebInstallNavigator = Navigator & {
+  install?: (options?: { manifest?: string; manifestId?: string }) => Promise<void>
+}
 type PwaWindow = Window & { __ziviInstallPrompt?: InstallPromptEvent | null }
 
 const ANDROID_INSTALLER_URL = 'https://github.com/waldjos/ZiviFactura/releases/download/android-installer-v1/ZiviFactura-Android.apk'
@@ -21,6 +24,7 @@ export default function InstallPrompt() {
   const [installed, setInstalled] = useState(() => isStandalone())
   const [fallbackReady, setFallbackReady] = useState(false)
   const isAndroid = useMemo(() => /Android/i.test(navigator.userAgent), [])
+  const webInstallSupported = typeof (navigator as WebInstallNavigator).install === 'function'
 
   useEffect(() => {
     const syncPrompt = () => setPromptEvent((window as PwaWindow).__ziviInstallPrompt || null)
@@ -48,7 +52,7 @@ export default function InstallPrompt() {
     }
   }, [])
 
-  async function install() {
+  async function installLegacyPwa() {
     const current = promptEvent || (window as PwaWindow).__ziviInstallPrompt || null
     if (!current) return
     try {
@@ -61,30 +65,51 @@ export default function InstallPrompt() {
     }
   }
 
-  if (installed || dismissed) return null
-  if (!promptEvent && !(isAndroid && fallbackReady)) return null
+  async function installWithWebInstallApi() {
+    const installApi = (navigator as WebInstallNavigator).install
+    if (!installApi) return
+    try {
+      await installApi.call(navigator)
+      setInstalled(true)
+    } catch (error) {
+      console.warn('[ZiviFactura] Web Install API:', error)
+    }
+  }
 
-  const nativePwaReady = Boolean(promptEvent)
+  if (installed || dismissed) return null
+  if (!promptEvent && !webInstallSupported && !(isAndroid && fallbackReady)) return null
+
+  const mode = promptEvent ? 'legacy-pwa' : webInstallSupported ? 'web-install-api' : 'android-fallback'
 
   return <aside className="pwaInstallCard" aria-label="Instalar ZiviFactura">
-    <img src="/zivifactura-app-v28.png?v=33" alt="" aria-hidden="true" />
+    <img src="/zivifactura-app-v28.png?v=34" alt="" aria-hidden="true" />
     <span className="pwaInstallCardCopy">
-      <strong>{nativePwaReady ? 'Instalar ZiviFactura' : 'Instalar ZiviFactura en Android'}</strong>
+      <strong>{mode === 'android-fallback' ? 'Instalar ZiviFactura en Android' : 'Instalar ZiviFactura'}</strong>
       <small>
-        {nativePwaReady
-          ? 'Chrome ya habilitó la instalación PWA nativa.'
-          : 'Chrome no habilitó WebAPK en este equipo. Usa el instalador Android de ZiviFactura: abre la misma aplicación web en modo app independiente.'}
+        {mode === 'legacy-pwa' && 'Chrome habilitó la instalación PWA nativa.'}
+        {mode === 'web-install-api' && 'Tu navegador admite la nueva API de instalación web. Instala ZiviFactura directamente como aplicación.'}
+        {mode === 'android-fallback' && 'Chrome no habilitó WebAPK en este equipo. Usa el instalador Android de ZiviFactura: abre la misma aplicación web en modo app independiente.'}
       </small>
     </span>
-    {nativePwaReady ? (
-      <button className="pwaInstallAction" type="button" onClick={() => void install()}>
+
+    {mode === 'legacy-pwa' && (
+      <button className="pwaInstallAction" type="button" onClick={() => void installLegacyPwa()}>
         <Download size={16}/> Instalar app
       </button>
-    ) : (
+    )}
+
+    {mode === 'web-install-api' && (
+      <button className="pwaInstallAction" type="button" onClick={() => void installWithWebInstallApi()}>
+        <Download size={16}/> Instalar app
+      </button>
+    )}
+
+    {mode === 'android-fallback' && (
       <a className="pwaInstallAction" href={ANDROID_INSTALLER_URL} target="_blank" rel="noreferrer">
         <ExternalLink size={16}/> Descargar instalador
       </a>
     )}
+
     <button className="pwaInstallClose" type="button" aria-label="Cerrar" onClick={() => setDismissed(true)}><X size={17}/></button>
   </aside>
 }
