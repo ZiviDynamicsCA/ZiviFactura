@@ -1,0 +1,36 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.zividynamics.zivifactura'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.zividynamics.zivifactura'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv('ZIVI_KEYSTORE') ?: '../zivi-twa.jks')
+            storePassword System.getenv('ZIVI_KEYSTORE_PASSWORD') ?: 'android'
+            keyAlias System.getenv('ZIVI_KEY_ALIAS') ?: 'zivifactura'
+            keyPassword System.getenv('ZIVI_KEY_PASSWORD') ?: 'android'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.3'
+}
