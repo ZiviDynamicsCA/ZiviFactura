@@ -6,56 +6,18 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // El manifest y el registro del service worker se controlan de forma
+      // explícita para evitar que Chrome dependa de inyecciones automáticas.
+      strategies: 'generateSW',
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      manifestFilename: 'manifest.webmanifest',
+      injectRegister: null,
+      manifest: false,
       includeAssets: [
         'zivifactura-app-192-v29.png',
         'zivifactura-app-v28.png',
         'zivifactura-header-v28.png',
         'zivifactura-rates-v28.png',
       ],
-      manifest: {
-        id: '/',
-        name: 'ZiviFactura',
-        short_name: 'ZiviFactura',
-        description: 'Facturación, cobros, cuentas por cobrar y tasas en una sola aplicación de Zivi Dynamics C.A.',
-        start_url: '/',
-        scope: '/',
-        display: 'standalone',
-        orientation: 'portrait-primary',
-        background_color: '#F6FAFF',
-        theme_color: '#F8FBFF',
-        lang: 'es',
-        categories: ['business', 'finance', 'productivity'],
-        prefer_related_applications: false,
-        icons: [
-          {
-            src: '/zivifactura-app-192-v29.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/zivifactura-app-v28.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/zivifactura-app-192-v29.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-          {
-            src: '/zivifactura-app-v28.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-        ],
-      },
       workbox: {
         cleanupOutdatedCaches: true,
         clientsClaim: true,
