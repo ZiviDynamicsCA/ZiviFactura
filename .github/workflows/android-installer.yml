@@ -1,0 +1,108 @@
+name: Build ZiviFactura Android installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android-wrapper/**'
+      - '.github/workflows/android-installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-installer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Download approved ZiviFactura icon
+        working-directory: android-wrapper
+        run: |
+          mkdir -p app/src/main/res/drawable
+          curl --fail --location --retry 5 \
+            https://zivi-factura.vercel.app/zivifactura-app-v28.png \
+            --output app/src/main/res/drawable/zivifactura_icon.png
+
+      - name: Generate signing key for installer v1
+        working-directory: android-wrapper
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore zivi-twa.jks \
+            -storepass android \
+            -keypass android \
+            -alias zivifactura \
+            -dname "CN=ZiviFactura, OU=Zivi Dynamics, O=Zivi Dynamics C.A., L=Caracas, C=VE" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 36500
+
+      - name: Build signed APK
+        working-directory: android-wrapper
+        env:
+          ZIVI_KEYSTORE: ${{ github.workspace }}/android-wrapper/zivi-twa.jks
+          ZIVI_KEYSTORE_PASSWORD: android
+          ZIVI_KEY_ALIAS: zivifactura
+          ZIVI_KEY_PASSWORD: android
+        run: gradle :app:assembleRelease --no-daemon
+
+      - name: Generate Digital Asset Links
+        working-directory: android-wrapper
+        run: |
+          FINGERPRINT=$(keytool -list -v \
+            -keystore zivi-twa.jks \
+            -storepass android \
+            -alias zivifactura | sed -n 's/.*SHA256: //p' | head -n 1)
+          test -n "$FINGERPRINT"
+          mkdir -p ../public/.well-known
+          cat > ../public/.well-known/assetlinks.json <<EOF
+          [{
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+              "namespace": "android_app",
+              "package_name": "com.zividynamics.zivifactura",
+              "sha256_cert_fingerprints": ["$FINGERPRINT"]
+            }
+          }]
+          EOF
+
+      - name: Publish Digital Asset Links to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/.well-known/assetlinks.json
+          if git diff --cached --quiet; then
+            echo "Asset links already current"
+          else
+            git commit -m "Publish Android Digital Asset Links"
+            git push origin HEAD:main
+          fi
+
+      - name: Prepare APK
+        working-directory: android-wrapper
+        run: cp app/build/outputs/apk/release/app-release.apk ../ZiviFactura-Android.apk
+
+      - name: Publish stable installer release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-installer-v1 --yes --cleanup-tag || true
+          git tag -f android-installer-v1
+          git push origin -f android-installer-v1
+          gh release create android-installer-v1 ZiviFactura-Android.apk \
+            --title "ZiviFactura Android Installer" \
+            --notes "Instalador Android de ZiviFactura. Abre la misma aplicación web de producción como aplicación independiente mediante Trusted Web Activity."
