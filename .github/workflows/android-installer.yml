@@ -25,10 +25,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+      - name: Install Gradle 8.9
+        run: |
+          curl --fail --location --retry 5 \
+            https://services.gradle.org/distributions/gradle-8.9-bin.zip \
+            --output /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          echo "/tmp/gradle-8.9/bin" >> "$GITHUB_PATH"
 
       - name: Download approved ZiviFactura icon
         working-directory: android-wrapper
@@ -69,16 +72,7 @@ jobs:
             -alias zivifactura | sed -n 's/.*SHA256: //p' | head -n 1)
           test -n "$FINGERPRINT"
           mkdir -p ../public/.well-known
-          cat > ../public/.well-known/assetlinks.json <<EOF
-          [{
-            "relation": ["delegate_permission/common.handle_all_urls"],
-            "target": {
-              "namespace": "android_app",
-              "package_name": "com.zividynamics.zivifactura",
-              "sha256_cert_fingerprints": ["$FINGERPRINT"]
-            }
-          }]
-          EOF
+          printf '[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.zividynamics.zivifactura","sha256_cert_fingerprints":["%s"]}}]\n' "$FINGERPRINT" > ../public/.well-known/assetlinks.json
 
       - name: Publish Digital Asset Links to main
         run: |
