@@ -15,25 +15,25 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/zivifactura-app-192-v29.png",
+      "src": "/zivifactura-app-192-v40.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/zivifactura-app-v28.png",
+      "src": "/zivifactura-app-512-v40.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/zivifactura-app-192-v29.png",
+      "src": "/zivifactura-app-192-v40.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/zivifactura-app-v28.png",
+      "src": "/zivifactura-app-512-v40.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
