@@ -4,107 +4,111 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#F8FBFF" />
-  <link rel="manifest" href="/manifest.webmanifest?v=35" />
-  <link rel="icon" href="/zivifactura-app-v28.png?v=35" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest?v=40" />
+  <link rel="icon" href="/zivifactura-app-512-v40.png" type="image/png" />
   <title>Diagnóstico PWA | ZiviFactura</title>
   <style>
-    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f5f9ff;color:#102348}.wrap{width:min(100%,720px);margin:auto;padding:24px 14px 44px}.card{background:#fff;border:1px solid #dce8f5;border-radius:20px;padding:18px;margin-bottom:12px;box-shadow:0 12px 34px rgba(25,71,127,.07)}h1{margin:0 0 7px;font-size:1.65rem}p{color:#66799a;line-height:1.5}.row{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid #edf3f9}.row:first-child{border-top:0}.row strong{font-size:.9rem}.row span{text-align:right;font-size:.82rem;font-weight:800}.ok{color:#087a52}.bad{color:#b42318}.wait{color:#9a6700}.buttons{display:grid;gap:9px}.buttons button,.buttons a,.buttons install{min-height:48px;border-radius:14px;border:0;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:850}.primary{background:linear-gradient(135deg,#00dff5,#079cff 58%,#1267ed);color:#fff}.secondary{background:#eef6ff;color:#126bd9;border:1px solid #d4e8fa!important}.small{font-size:.75rem;color:#7a8ca7}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f7faff;border:1px solid #e1ebf5;border-radius:12px;padding:10px;font-size:.72rem;overflow-wrap:anywhere}#installElementSlot:empty{display:none}
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f5f9ff;color:#102348}.wrap{width:min(100%,760px);margin:auto;padding:24px 14px 44px}.card{background:#fff;border:1px solid #dce8f5;border-radius:20px;padding:18px;margin-bottom:12px;box-shadow:0 12px 34px rgba(25,71,127,.07)}h1{margin:0 0 7px;font-size:1.65rem}p{color:#66799a;line-height:1.5}.row{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid #edf3f9}.row:first-child{border-top:0}.row strong{font-size:.9rem}.row span{text-align:right;font-size:.82rem;font-weight:800}.ok{color:#087a52}.bad{color:#b42318}.wait{color:#9a6700}.buttons{display:grid;gap:9px}.buttons button,.buttons a{min-height:48px;border-radius:14px;border:0;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:850}.primary{background:linear-gradient(135deg,#00dff5,#079cff 58%,#1267ed);color:#fff}.secondary{background:#eef6ff;color:#126bd9;border:1px solid #d4e8fa!important}.small{font-size:.75rem;color:#7a8ca7}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f7faff;border:1px solid #e1ebf5;border-radius:12px;padding:10px;font-size:.72rem;overflow-wrap:anywhere;white-space:pre-wrap}
   </style>
 </head>
 <body>
 <main class="wrap">
-  <section class="card"><h1>Diagnóstico de instalación</h1><p>Esta pantalla comprueba tres rutas de instalación de Chromium: <code>beforeinstallprompt</code>, <code>navigator.install()</code> y el nuevo elemento seguro <code>&lt;install&gt;</code>.</p></section>
+  <section class="card">
+    <h1>Diagnóstico de instalación</h1>
+    <p>Esta pantalla valida manifest, service worker e iconos reales 192×192 y 512×512 de ZiviFactura.</p>
+  </section>
   <section class="card" id="checks"></section>
   <section class="card buttons">
     <button id="install" class="primary" disabled>Instalar ZiviFactura</button>
-    <div id="installElementSlot"></div>
     <button id="refresh" class="secondary">Volver a comprobar</button>
     <a class="secondary" href="/">Volver a ZiviFactura</a>
-    <p class="small">El sistema usa automáticamente la mejor ruta de instalación que tu versión de Chrome exponga.</p>
+    <p class="small">Si acabas de desplegar, abre esta página en modo incógnito o limpia el sitio para evitar caché anterior.</p>
   </section>
   <section class="card"><strong>Detalle técnico</strong><div id="detail" class="code">Preparando…</div></section>
 </main>
 <script>
-  let deferredPrompt=null
-  const rows=[]
-  const checks=document.getElementById('checks'),detail=document.getElementById('detail'),install=document.getElementById('install'),slot=document.getElementById('installElementSlot')
-  const add=(name,value,state='wait')=>rows.push({name,value,state})
-  const render=()=>{checks.innerHTML=rows.map(r=>`<div class="row"><strong>${r.name}</strong><span class="${r.state}">${r.value}</span></div>`).join('')}
-  const webInstallSupported=()=>typeof navigator.install==='function'
-  const installElementSupported=()=>('HTMLInstallElement' in window)
+  let deferredPrompt = null
+  const rows = []
+  const checks = document.getElementById('checks')
+  const detail = document.getElementById('detail')
+  const install = document.getElementById('install')
+  const add = (name, value, state = 'wait') => rows.push({ name, value, state })
+  const render = () => { checks.innerHTML = rows.map(r => `<div class="row"><strong>${r.name}</strong><span class="${r.state}">${r.value}</span></div>`).join('') }
 
-  function renderInstallElement(){
-    slot.innerHTML=''
-    if(!installElementSupported()) return
-    const element=document.createElement('install')
-    element.className='primary'
-    element.textContent='Instalar con control seguro de Chrome'
-    element.addEventListener('promptaction',()=>void run())
-    element.addEventListener('promptdismiss',()=>void run())
-    slot.appendChild(element)
-  }
-
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;install.disabled=false;void run()})
-  window.addEventListener('appinstalled',()=>{deferredPrompt=null;install.disabled=true;void run()})
-
-  install.addEventListener('click',async()=>{
-    try{
-      if(deferredPrompt){
-        await deferredPrompt.prompt();await deferredPrompt.userChoice.catch(()=>null);deferredPrompt=null
-      }else if(webInstallSupported()){
-        await navigator.install()
-      }
-    }catch(e){
-      alert(`No se pudo iniciar la instalación: ${e?.message||e}`)
-    }
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault()
+    deferredPrompt = event
+    install.disabled = false
     void run()
   })
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null
+    install.disabled = true
+    void run()
+  })
+  install.addEventListener('click', async () => {
+    if (!deferredPrompt) return
+    await deferredPrompt.prompt()
+    await deferredPrompt.userChoice.catch(() => null)
+    deferredPrompt = null
+    install.disabled = true
+    void run()
+  })
+  document.getElementById('refresh').addEventListener('click', () => void run())
 
-  document.getElementById('refresh').addEventListener('click',()=>void run())
+  function imageSize(src) {
+    return new Promise(resolve => {
+      const img = new Image()
+      img.onload = () => resolve(`${img.naturalWidth}×${img.naturalHeight}`)
+      img.onerror = () => resolve('ERROR')
+      img.src = `${src}${src.includes('?') ? '&' : '?'}check=${Date.now()}`
+    })
+  }
 
-  async function imageSize(src){return new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(`${img.naturalWidth}×${img.naturalHeight}`);img.onerror=()=>resolve('ERROR');img.src=`${src}${src.includes('?')?'&':'?'}check=${Date.now()}`})}
+  async function run() {
+    rows.length = 0
+    add('HTTPS / contexto seguro', window.isSecureContext ? 'Correcto' : 'No seguro', window.isSecureContext ? 'ok' : 'bad')
+    add('Service Worker soportado', 'serviceWorker' in navigator ? 'Sí' : 'No', 'serviceWorker' in navigator ? 'ok' : 'bad')
 
-  async function run(){
-    rows.length=0
-    add('HTTPS / contexto seguro',window.isSecureContext?'Correcto':'No seguro',window.isSecureContext?'ok':'bad')
-    add('Service Worker soportado','serviceWorker' in navigator?'Sí':'No','serviceWorker' in navigator?'ok':'bad')
-    let sw='No registrado',scope='—',controlled=Boolean(navigator.serviceWorker?.controller)
-    try{
-      if('serviceWorker' in navigator){
-        const reg=await navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'none'});await reg.update().catch(()=>{});await navigator.serviceWorker.ready;sw='Registrado';scope=reg.scope;controlled=Boolean(navigator.serviceWorker.controller)
+    let sw = 'No registrado'
+    let scope = '—'
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+        await reg.update().catch(() => {})
+        await navigator.serviceWorker.ready
+        sw = 'Registrado'
+        scope = reg.scope
       }
-    }catch(e){sw=`ERROR: ${e?.message||e}`}
-    add('Service Worker',sw,sw==='Registrado'?'ok':'bad')
-    add('Scope del Worker',scope,scope.includes(location.origin)?'ok':'wait')
-    add('Página controlada por Worker',controlled?'Sí':'Aún no',controlled?'ok':'wait')
+    } catch (error) {
+      sw = `ERROR: ${error?.message || error}`
+    }
+    add('Service Worker', sw, sw === 'Registrado' ? 'ok' : 'bad')
+    add('Scope del Worker', scope, scope.includes(location.origin) ? 'ok' : 'wait')
 
-    let manifestData=null, manifestType='—'
-    try{
-      const res=await fetch(`/manifest.webmanifest?check=${Date.now()}`,{cache:'no-store'});const data=await res.json();manifestData=data;manifestType=res.headers.get('content-type')
-      const validDisplay=['standalone','fullscreen','minimal-ui','window-controls-overlay'].includes(data.display)
-      add('Manifest',res.ok?'Disponible':'Error HTTP',res.ok?'ok':'bad')
-      add('Nombre',data.name||data.short_name||'Falta',data.name||data.short_name?'ok':'bad')
-      add('Manifest id',data.id||'Falta',data.id?'ok':'bad')
-      add('start_url',data.start_url||'Falta',data.start_url?'ok':'bad')
-      add('display',data.display||'Falta',validDisplay?'ok':'bad')
-      const i192=(data.icons||[]).find(i=>String(i.sizes).includes('192x192'))
-      const i512=(data.icons||[]).find(i=>String(i.sizes).includes('512x512'))
-      const s192=i192?await imageSize(i192.src):'Falta',s512=i512?await imageSize(i512.src):'Falta'
-      add('Icono 192×192',s192,s192==='192×192'?'ok':'bad')
-      add('Icono 512×512',s512,s512==='512×512'?'ok':'bad')
-    }catch(e){add('Manifest',`ERROR: ${e?.message||e}`,'bad')}
+    let manifestData = null
+    try {
+      const res = await fetch(`/manifest.webmanifest?check=${Date.now()}`, { cache: 'no-store' })
+      manifestData = await res.json()
+      add('Manifest', res.ok ? 'Disponible' : 'Error HTTP', res.ok ? 'ok' : 'bad')
+      add('Nombre', manifestData.name || manifestData.short_name || 'Falta', manifestData.name || manifestData.short_name ? 'ok' : 'bad')
+      add('start_url', manifestData.start_url || 'Falta', manifestData.start_url ? 'ok' : 'bad')
+      add('display', manifestData.display || 'Falta', ['standalone','fullscreen','minimal-ui','window-controls-overlay'].includes(manifestData.display) ? 'ok' : 'bad')
+      const i192 = (manifestData.icons || []).find(i => String(i.sizes).includes('192x192'))
+      const i512 = (manifestData.icons || []).find(i => String(i.sizes).includes('512x512'))
+      const s192 = i192 ? await imageSize(i192.src) : 'Falta'
+      const s512 = i512 ? await imageSize(i512.src) : 'Falta'
+      add('Icono 192×192', s192, s192 === '192×192' ? 'ok' : 'bad')
+      add('Icono 512×512', s512, s512 === '512×512' ? 'ok' : 'bad')
+    } catch (error) {
+      add('Manifest', `ERROR: ${error?.message || error}`, 'bad')
+    }
 
-    const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true
-    const newApi=webInstallSupported(), htmlInstall=installElementSupported()
-    add('Ya instalada',standalone?'Sí':'No',standalone?'ok':'wait')
-    add('beforeinstallprompt',deferredPrompt?'Sí':'No',deferredPrompt?'ok':'wait')
-    add('Web Install API',newApi?'Disponible':'No disponible',newApi?'ok':'wait')
-    add('Elemento <install>',htmlInstall?'Disponible':'No disponible',htmlInstall?'ok':'wait')
-    const route=deferredPrompt?'PWA clásica':newApi?'navigator.install()':htmlInstall?'<install>':'Bloqueada por navegador'
-    add('Ruta de instalación',route,deferredPrompt||newApi||htmlInstall?'ok':'bad')
-    install.disabled=!(deferredPrompt||newApi)
-    renderInstallElement()
-    detail.textContent=JSON.stringify({manifest:manifestData,manifestContentType:manifestType,serviceWorker:{sw,scope,controlled},beforeinstallprompt:Boolean(deferredPrompt),webInstallApi:newApi,htmlInstallElement:htmlInstall,standalone,userAgent:navigator.userAgent},null,2)
+    const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
+    add('Ya instalada', standalone ? 'Sí' : 'No', standalone ? 'ok' : 'wait')
+    add('Prompt instalable', deferredPrompt ? 'Disponible' : 'Aún no emitido', deferredPrompt ? 'ok' : 'wait')
+    install.disabled = !deferredPrompt
+    detail.textContent = JSON.stringify({ manifest: manifestData, serviceWorker: { sw, scope }, beforeinstallprompt: Boolean(deferredPrompt), standalone, userAgent: navigator.userAgent }, null, 2)
     render()
   }
   void run()
