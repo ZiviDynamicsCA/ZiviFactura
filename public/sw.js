@@ -1,9 +1,9 @@
-const CACHE = 'zivifactura-shell-v40'
+const CACHE = 'zivifactura-shell-v42'
 const APP_SHELL = [
   '/',
-  '/manifest.webmanifest?v=40',
-  '/zivifactura-app-192-v40.png',
-  '/zivifactura-app-512-v40.png',
+  '/manifest.webmanifest?v=42',
+  '/zivifactura-app-192-v42.png?v=42',
+  '/zivifactura-app-512-v42.png?v=42',
 ]
 
 self.addEventListener('install', event => {
