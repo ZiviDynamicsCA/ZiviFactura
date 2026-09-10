@@ -4,25 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#F8FBFF" />
-  <link rel="manifest" href="/manifest.webmanifest?v=40" />
-  <link rel="icon" href="/zivifactura-app-512-v40.png" type="image/png" />
+  <link rel="manifest" href="/manifest.webmanifest?v=42" />
+  <link rel="icon" href="/zivifactura-app-512-v42.png?v=42" type="image/png" />
   <title>Diagnóstico PWA | ZiviFactura</title>
   <style>
-    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f5f9ff;color:#102348}.wrap{width:min(100%,760px);margin:auto;padding:24px 14px 44px}.card{background:#fff;border:1px solid #dce8f5;border-radius:20px;padding:18px;margin-bottom:12px;box-shadow:0 12px 34px rgba(25,71,127,.07)}h1{margin:0 0 7px;font-size:1.65rem}p{color:#66799a;line-height:1.5}.row{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid #edf3f9}.row:first-child{border-top:0}.row strong{font-size:.9rem}.row span{text-align:right;font-size:.82rem;font-weight:800}.ok{color:#087a52}.bad{color:#b42318}.wait{color:#9a6700}.buttons{display:grid;gap:9px}.buttons button,.buttons a{min-height:48px;border-radius:14px;border:0;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:850}.primary{background:linear-gradient(135deg,#00dff5,#079cff 58%,#1267ed);color:#fff}.secondary{background:#eef6ff;color:#126bd9;border:1px solid #d4e8fa!important}.small{font-size:.75rem;color:#7a8ca7}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f7faff;border:1px solid #e1ebf5;border-radius:12px;padding:10px;font-size:.72rem;overflow-wrap:anywhere;white-space:pre-wrap}
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f5f9ff;color:#102348}.wrap{width:min(100%,760px);margin:auto;padding:24px 14px 44px}.card{background:#fff;border:1px solid #dce8f5;border-radius:20px;padding:18px;margin-bottom:12px;box-shadow:0 12px 34px rgba(25,71,127,.07)}h1{margin:0 0 7px;font-size:1.65rem}p{color:#66799a;line-height:1.5}.row{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid #edf3f9}.row:first-child{border-top:0}.row strong{font-size:.9rem}.row span{text-align:right;font-size:.82rem;font-weight:800}.ok{color:#087a52}.bad{color:#b42318}.wait{color:#9a6700}.buttons{display:grid;gap:9px}.buttons button,.buttons a{min-height:48px;border-radius:14px;border:0;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:850}.primary{background:linear-gradient(135deg,#00dff5,#079cff 58%,#1267ed);color:#fff}.secondary{background:#eef6ff;color:#126bd9;border:1px solid #d4e8fa!important}.small{font-size:.75rem;color:#7a8ca7}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f7faff;border:1px solid #e1ebf5;border-radius:12px;padding:10px;font-size:.72rem;overflow-wrap:anywhere;white-space:pre-wrap}.preview{display:flex;gap:14px;align-items:center}.preview img{width:72px;height:72px;border-radius:18px;background:#eaf7ff;box-shadow:0 8px 22px rgba(5,79,159,.18)}
   </style>
 </head>
 <body>
 <main class="wrap">
   <section class="card">
     <h1>Diagnóstico de instalación</h1>
-    <p>Esta pantalla valida manifest, service worker e iconos reales 192×192 y 512×512 de ZiviFactura.</p>
+    <p>Valida manifest, service worker e iconos reales 192×192 y 512×512 de ZiviFactura.</p>
+    <div class="preview"><img src="/zivifactura-app-512-v42.png?v=42" alt="Icono ZiviFactura"><strong>Icono de instalación v42</strong></div>
   </section>
   <section class="card" id="checks"></section>
   <section class="card buttons">
     <button id="install" class="primary" disabled>Instalar ZiviFactura</button>
     <button id="refresh" class="secondary">Volver a comprobar</button>
     <a class="secondary" href="/">Volver a ZiviFactura</a>
-    <p class="small">Si acabas de desplegar, abre esta página en modo incógnito o limpia el sitio para evitar caché anterior.</p>
+    <p class="small">Si el teléfono ya instaló una versión previa, desinstala la app y borra datos del sitio para que Android tome el icono nuevo.</p>
   </section>
   <section class="card"><strong>Detalle técnico</strong><div id="detail" class="code">Preparando…</div></section>
 </main>
