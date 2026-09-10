@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Rescate de datos | ZiviFactura</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f4f8ff;color:#102348}.wrap{max-width:980px;margin:auto;padding:24px 14px 54px}.card{background:#fff;border:1px solid #dce8f5;border-radius:22px;padding:18px;margin:12px 0;box-shadow:0 14px 38px rgba(18,56,102,.08)}h1{margin:0;font-size:1.7rem}p{color:#637797;line-height:1.45}.danger{background:#fff2f0;border-color:#ffd3cc}.ok{color:#087a52}.bad{color:#b42318}.warn{color:#946200}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.metric{background:#f8fbff;border:1px solid #e3edf8;border-radius:16px;padding:14px}.metric span{display:block;color:#637797;font-size:.85rem}.metric strong{display:block;font-size:1.55rem;margin-top:4px}.buttons{display:flex;flex-wrap:wrap;gap:10px}button,a.btn{border:0;border-radius:14px;padding:13px 15px;font-weight:850;text-decoration:none;cursor:pointer}.primary{background:linear-gradient(135deg,#00dff5,#079cff 58%,#1267ed);color:#fff}.secondary{background:#eef6ff;color:#126bd9;border:1px solid #d4e8fa}.table{overflow:auto}.row{display:grid;grid-template-columns:120px 1fr 110px 110px 110px;gap:10px;padding:10px 0;border-top:1px solid #edf3f9;align-items:center;font-size:.9rem}.head{font-weight:900;color:#637797}.small{font-size:.78rem;color:#71839e}.code{white-space:pre-wrap;overflow-wrap:anywhere;background:#0f172a;color:#e2e8f0;border-radius:14px;padding:14px;font-size:.78rem}.hidden{display:none}@media(max-width:720px){.row{grid-template-columns:1fr}.head{display:none}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <section class="card danger">
+    <h1>Rescate de datos locales</h1>
+    <p><strong>No borres caché, no restablezcas el sitio y no desinstales la app</strong> mientras se revisa esto. Esta pantalla lee directamente la base local <code>FacturaLocalDB</code> del dominio actual y permite exportar una copia JSON.</p>
+  </section>
+
+  <section class="card">
+    <div class="buttons">
+      <button class="primary" id="scan">Escanear datos locales</button>
+      <button class="secondary" id="backup" disabled>Descargar respaldo JSON</button>
+      <button class="secondary" id="activate" disabled>Activar empresa con más facturas</button>
+      <a class="btn secondary" href="/">Volver a ZiviFactura</a>
+    </div>
+    <p class="small">Importante: los datos locales dependen del dominio. Si aquí no aparecen, prueba también el dominio anterior de despliegue.</p>
+  </section>
+
+  <section class="card grid" id="metrics"></section>
+  <section class="card" id="companies"></section>
+  <section class="card table" id="invoices"></section>
+  <section class="card"><strong>Detalle técnico</strong><div class="code" id="log">Listo para escanear.</div></section>
+</main>
+<script>
+const DB_NAME='FacturaLocalDB'
+const ACTIVE_KEY='zivifactura.activeCompanyId'
+let snapshot=null
+function $(id){return document.getElementById(id)}
+function log(v){$('log').textContent=typeof v==='string'?v:JSON.stringify(v,null,2)}
+function reqToPromise(req){return new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('IndexedDB error'))})}
+function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('No se pudo abrir IndexedDB'));req.onupgradeneeded=()=>{try{req.transaction.abort()}catch{};reject(new Error('La base existe pero requiere actualización. Abre primero la app normal y luego vuelve a esta pantalla.'))}})}
+async function all(db,store){if(!db.objectStoreNames.contains(store))return[];const tx=db.transaction(store,'readonly');return await reqToPromise(tx.objectStore(store).getAll())}
+function by(arr,fn){const m={};for(const x of arr){const k=String(fn(x));m[k]=(m[k]||0)+1}return m}
+function render(){const s=snapshot;const active=Number(localStorage.getItem(ACTIVE_KEY)||'1');const byCompany=by(s.invoices,x=>x.companyId||1);const topCompany=Object.entries(byCompany).sort((a,b)=>b[1]-a[1])[0]?.[0]||'1';$('metrics').innerHTML=`<div class="metric"><span>Dominio actual</span><strong>${location.host}</strong></div><div class="metric"><span>Facturas encontradas</span><strong>${s.invoices.length}</strong></div><div class="metric"><span>Empresas</span><strong>${s.company.length}</strong></div><div class="metric"><span>Empresa activa</span><strong>${active}</strong></div><div class="metric"><span>Clientes</span><strong>${s.clients.length}</strong></div><div class="metric"><span>Pagos</span><strong>${s.payments.length}</strong></div>`;$('companies').innerHTML='<h2>Facturas por empresa</h2>'+Object.entries(byCompany).map(([id,count])=>{const c=s.company.find(x=>String(x.id)===String(id));return `<p><strong>Empresa ${id}</strong> ${c?.name?`· ${c.name}`:''}: <strong>${count}</strong> factura(s)</p>`}).join('')||'<p>No hay empresas con facturas.</p>';$('activate').disabled=!topCompany;$('activate').onclick=()=>{localStorage.setItem(ACTIVE_KEY,String(topCompany));alert('Empresa activa cambiada a '+topCompany+'. Ahora vuelve a ZiviFactura.');location.href='/'};const rows=s.invoices.slice().sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));$('invoices').innerHTML='<h2>Facturas detectadas sin filtro</h2><div class="row head"><div>Número</div><div>Cliente</div><div>Estado</div><div>Empresa</div><div>Fecha</div></div>'+rows.map(i=>`<div class="row"><div><strong>${i.number||'Sin número'}</strong></div><div>${i.client?.name||'Sin cliente'}</div><div>${i.status||'-'}</div><div>${i.companyId||1}</div><div>${i.date||''}</div></div>`).join('')||'<p>No se encontraron facturas en este dominio.</p>';log({domain:location.origin,activeCompanyId:active,counts:{company:s.company.length,clients:s.clients.length,products:s.products.length,invoices:s.invoices.length,payments:s.payments.length},invoiceCountByCompany:byCompany})}
+async function scan(){try{const db=await openDb();snapshot={version:3,exportedAt:new Date().toISOString(),domain:location.origin,activeCompanyId:Number(localStorage.getItem(ACTIVE_KEY)||'1'),company:await all(db,'company'),clients:await all(db,'clients'),products:await all(db,'products'),invoices:await all(db,'invoices'),payments:await all(db,'payments'),localStorage:Object.fromEntries(Object.keys(localStorage).filter(k=>/factura|zivi|invoice/i.test(k)).map(k=>[k,localStorage.getItem(k)]))};$('backup').disabled=false;render()}catch(e){snapshot=null;$('backup').disabled=true;$('activate').disabled=true;log('ERROR: '+(e?.message||e));$('metrics').innerHTML='<div class="metric"><span>Resultado</span><strong class="bad">Sin acceso</strong></div>'}}
+function backup(){if(!snapshot)return;const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`zivifactura-rescate-${location.host}-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+$('scan').onclick=scan;$('backup').onclick=backup;scan();
+</script>
+</body>
+</html>
