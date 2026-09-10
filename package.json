@@ -1,11 +1,11 @@
 {
   "name": "zivifactura",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/generate-pwa-icons.mjs && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
