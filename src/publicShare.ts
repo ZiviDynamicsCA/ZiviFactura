@@ -109,23 +109,22 @@ export async function publishPublicDocument(invoice: Invoice, company: Company) 
   const payload = buildPublicPayload(invoice, company, user?.uid || 'local')
 
   if (firestore && user) {
-    try {
-      await setDoc(doc(firestore, 'publicDocuments', id), { ...payload, updatedAt: serverTimestamp() }, { merge: true })
-      if (!invoice.publicShareId || invoice.publicShareId.startsWith('local-')) {
-        await db.invoices.update(invoice.id, { publicShareId: id, updatedAt: new Date().toISOString() })
-      }
-      return {
-        id,
-        url: `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`,
-        total: payload.total,
-      }
-    } catch (error) {
-      console.warn('[ZiviFactura] No se pudo publicar en Firestore. Se usará enlace local.', error)
-    }
+    const url = `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`
+
+    // No se bloquea el botón esperando la red. Esto evita que WhatsApp, mailto
+    // o el share nativo sean bloqueados por el navegador después de un await largo.
+    void setDoc(doc(firestore, 'publicDocuments', id), { ...payload, updatedAt: serverTimestamp() }, { merge: true })
+      .then(() => {
+        if (!invoice.publicShareId || invoice.publicShareId.startsWith('local-')) {
+          return db.invoices.update(invoice.id!, { publicShareId: id, updatedAt: new Date().toISOString() })
+        }
+        return undefined
+      })
+      .catch(error => console.warn('[ZiviFactura] publicación remota pendiente/fallida:', error))
+
+    return { id, url, total: payload.total }
   }
 
-  // Fallback seguro: permite compartir/ver la factura aunque Firebase no esté listo,
-  // no haya sesión activa o Firestore rechace temporalmente la escritura.
   return {
     id: `local-${id}`,
     url: localDocumentUrl({ ...payload, ownerUid: 'local', localOnly: true, publicShareId: id }),
