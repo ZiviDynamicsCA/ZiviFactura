@@ -9,7 +9,7 @@ import QuickTools from './QuickTools'
 import ZiviChrome from './ZiviChrome'
 import { initAutomaticBackup } from './cloudBackup'
 import { dedupeStoredClients, startClientDedupWatcher } from './clientDedup'
-import { repairExactInvoiceDuplicates } from './dataIntegrity'
+import { repairExactInvoiceDuplicates, repairExactPaymentDuplicates } from './dataIntegrity'
 import './styles.css'
 import './payments.css'
 import './proofs.css'
@@ -34,7 +34,7 @@ type PwaWindow = Window & {
 }
 
 const pwaWindow = window as PwaWindow
-const PWA_RESET_KEY = 'zivifactura.pwa-reset-v36'
+const PWA_RESET_KEY = 'zivifactura.pwa-reset-v37'
 
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault()
@@ -115,13 +115,14 @@ async function registerPwaServiceWorker() {
 if (document.readyState === 'complete') void registerPwaServiceWorker()
 else window.addEventListener('load', () => void registerPwaServiceWorker(), { once: true })
 
-const INVOICE_REPAIR_RELOAD_KEY = 'zivifactura.invoice-repair-reload.v2'
+const INTEGRITY_REPAIR_RELOAD_KEY = 'zivifactura.integrity-repair-reload.v3'
 window.addEventListener('zivifactura:data-synced', () => {
-  if (sessionStorage.getItem(INVOICE_REPAIR_RELOAD_KEY)) return
-  void repairExactInvoiceDuplicates()
-    .then(result => {
-      if (result.hidden <= 0) return
-      sessionStorage.setItem(INVOICE_REPAIR_RELOAD_KEY, '1')
+  if (sessionStorage.getItem(INTEGRITY_REPAIR_RELOAD_KEY)) return
+  void Promise.all([repairExactInvoiceDuplicates(), repairExactPaymentDuplicates()])
+    .then(([invoiceResult, paymentResult]) => {
+      const hidden = invoiceResult.hidden + paymentResult.hidden
+      if (hidden <= 0) return
+      sessionStorage.setItem(INTEGRITY_REPAIR_RELOAD_KEY, '1')
       window.setTimeout(() => window.location.reload(), 180)
     })
     .catch(error => console.warn('[ZiviFactura] duplicate repair after sync:', error))
@@ -129,11 +130,18 @@ window.addEventListener('zivifactura:data-synced', () => {
 
 async function bootstrap() {
   await dedupeStoredClients().catch(error => console.warn('[ZiviFactura] client cleanup:', error))
-  const repair = await repairExactInvoiceDuplicates().catch(error => {
-    console.warn('[ZiviFactura] duplicate repair:', error)
-    return null
-  })
-  if (repair?.hidden) console.info(`[ZiviFactura] ${repair.hidden} factura(s) duplicada(s) ocultada(s) sin borrar datos.`)
+  const [invoiceRepair, paymentRepair] = await Promise.all([
+    repairExactInvoiceDuplicates().catch(error => {
+      console.warn('[ZiviFactura] duplicate invoice repair:', error)
+      return null
+    }),
+    repairExactPaymentDuplicates().catch(error => {
+      console.warn('[ZiviFactura] duplicate payment repair:', error)
+      return null
+    }),
+  ])
+  if (invoiceRepair?.hidden) console.info(`[ZiviFactura] ${invoiceRepair.hidden} factura(s) duplicada(s) ocultada(s) sin borrar datos.`)
+  if (paymentRepair?.hidden) console.info(`[ZiviFactura] ${paymentRepair.hidden} movimiento(s) de caja duplicado(s) ocultado(s) sin borrar datos.`)
   startClientDedupWatcher()
   initAutomaticBackup()
 
