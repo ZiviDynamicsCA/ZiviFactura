@@ -1,12 +1,15 @@
 import { db } from './db'
 import { totals } from './pdf'
-import type { Invoice } from './types'
+import type { Invoice, Payment } from './types'
 
-export type InvoiceDuplicateRepairResult = {
+export type DuplicateRepairResult = {
   scanned: number
   groups: number
   hidden: number
 }
+
+export type InvoiceDuplicateRepairResult = DuplicateRepairResult
+export type PaymentDuplicateRepairResult = DuplicateRepairResult
 
 function normalizeText(value = '') {
   return value
@@ -17,13 +20,17 @@ function normalizeText(value = '') {
     .replace(/\s+/g, ' ')
 }
 
+function normalizeCode(value = '') {
+  return normalizeText(value).replace(/\s+/g, '').replace(/[^a-z0-9@._:-]/g, '')
+}
+
 function moneyKey(value: unknown) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? Number(parsed.toFixed(4)) : 0
 }
 
-function visibleCompanyId(invoice: Invoice) {
-  return Number(invoice.originalCompanyId || invoice.companyId) || 1
+function visibleCompanyId(row: { companyId?: number; originalCompanyId?: number }) {
+  return Number(row.originalCompanyId || row.companyId) || 1
 }
 
 export function invoiceTechnicalSignature(invoice: Invoice) {
@@ -58,16 +65,49 @@ export function invoiceTechnicalSignature(invoice: Invoice) {
   })
 }
 
-function recordTime(invoice: Invoice) {
+export function paymentTechnicalSignature(payment: Payment) {
+  return JSON.stringify({
+    companyId: visibleCompanyId(payment),
+    invoiceNumber: normalizeCode(payment.invoiceNumber),
+    invoiceCurrency: normalizeCode(payment.invoiceCurrency || 'USD').toUpperCase(),
+    amountApplied: moneyKey(payment.amountApplied),
+    amountVes: moneyKey(payment.amountVes),
+    method: payment.method || 'other',
+    date: payment.date || '',
+    reference: normalizeCode(payment.reference || ''),
+    proofSubmissionId: normalizeCode(payment.proofSubmissionId || ''),
+    rateValue: moneyKey(payment.rateValue),
+    notes: normalizeText(payment.notes || ''),
+  })
+}
+
+function invoiceRecordTime(invoice: Invoice) {
   return Date.parse(invoice.updatedAt || invoice.createdAt || '') || 0
 }
 
-function canonicalScore(invoice: Invoice) {
+function paymentRecordTime(payment: Payment) {
+  return Date.parse(payment.updatedAt || payment.createdAt || '') || 0
+}
+
+function invoiceCanonicalScore(invoice: Invoice) {
   let score = 0
   if ((Number(invoice.companyId) || 1) > 0) score += 1_000_000
   if (invoice.publicShareId && !invoice.publicShareId.startsWith('local-')) score += 25_000
   if (invoice.syncId) score += 10_000
-  return score + recordTime(invoice)
+  return score + invoiceRecordTime(invoice)
+}
+
+function paymentCanonicalScore(payment: Payment) {
+  let score = 0
+  if ((Number(payment.companyId) || 1) > 0) score += 1_000_000
+  if (payment.proofSubmissionId) score += 30_000
+  if (payment.syncId) score += 10_000
+  if (payment.key) score += 5_000
+  return score + paymentRecordTime(payment)
+}
+
+export function isVisiblePayment(payment: Payment) {
+  return (Number(payment.companyId) || 1) > 0 && !payment.technicalDuplicateOf
 }
 
 export async function repairExactInvoiceDuplicates(): Promise<InvoiceDuplicateRepairResult> {
@@ -93,7 +133,7 @@ export async function repairExactInvoiceDuplicates(): Promise<InvoiceDuplicateRe
     for (const [signature, rows] of groups.entries()) {
       if (rows.length < 2) continue
       duplicateGroups += 1
-      const [keeper, ...duplicates] = [...rows].sort((a, b) => canonicalScore(b) - canonicalScore(a))
+      const [keeper, ...duplicates] = [...rows].sort((a, b) => invoiceCanonicalScore(b) - invoiceCanonicalScore(a))
       const duplicateOf = keeper.syncId || `local-invoice-${keeper.id || keeper.number}`
 
       for (const duplicate of duplicates) {
@@ -117,4 +157,53 @@ export async function repairExactInvoiceDuplicates(): Promise<InvoiceDuplicateRe
   }
 
   return { scanned: invoices.length, groups: duplicateGroups, hidden }
+}
+
+export async function repairExactPaymentDuplicates(): Promise<PaymentDuplicateRepairResult> {
+  const payments = await db.payments.toArray()
+  const active = payments.filter(payment => {
+    const companyId = Number(payment.companyId) || 1
+    return companyId > 0 && !payment.technicalDuplicateOf && Boolean(payment.invoiceNumber?.trim())
+  })
+
+  const groups = new Map<string, Payment[]>()
+  for (const payment of active) {
+    const signature = paymentTechnicalSignature(payment)
+    const rows = groups.get(signature) || []
+    rows.push(payment)
+    groups.set(signature, rows)
+  }
+
+  let hidden = 0
+  let duplicateGroups = 0
+  const now = new Date().toISOString()
+
+  await db.transaction('rw', db.payments, async () => {
+    for (const [signature, rows] of groups.entries()) {
+      if (rows.length < 2) continue
+      duplicateGroups += 1
+      const [keeper, ...duplicates] = [...rows].sort((a, b) => paymentCanonicalScore(b) - paymentCanonicalScore(a))
+      const duplicateOf = keeper.syncId || keeper.key || `local-payment-${keeper.id || keeper.invoiceNumber}`
+
+      for (const duplicate of duplicates) {
+        if (!duplicate.id) continue
+        const originalCompanyId = Number(duplicate.companyId) || 1
+        await db.payments.update(duplicate.id, {
+          originalCompanyId,
+          companyId: -Math.abs(originalCompanyId),
+          technicalDuplicateOf: duplicateOf,
+          technicalDuplicateHiddenAt: now,
+          technicalDuplicateSignature: signature,
+          updatedAt: now,
+        } as Partial<Payment>)
+        hidden += 1
+      }
+    }
+  })
+
+  if (hidden > 0) {
+    window.dispatchEvent(new CustomEvent('zivifactura:integrity-repaired', { detail: { hiddenPaymentDuplicates: hidden } }))
+  }
+
+  return { scanned: payments.length, groups: duplicateGroups, hidden }
 }
