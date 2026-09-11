@@ -1,4 +1,4 @@
-/* Ajustes móviles finales para calculadora, dock inferior y tasas. */
+/* Ajustes móviles finales para calculadora, dock inferior y experiencia de factura. */
 .quickExpression input[readonly] {
   caret-color: transparent;
   cursor: default;
@@ -27,7 +27,7 @@
     padding-bottom: 10px !important;
   }
 
-  /* Dock móvil: una sola fila. Se oculta Tasas del dock y queda disponible dentro de Más. */
+  /* Dock móvil: una sola fila compacta. Tasas queda dentro de Más. */
   .quickDock {
     display: grid !important;
     grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
@@ -43,7 +43,7 @@
     max-height: 82px !important;
     padding: 5px 4px calc(5px + env(safe-area-inset-bottom)) !important;
     gap: 1px !important;
-    overflow: visible !important;
+    overflow: hidden !important;
     align-items: stretch !important;
   }
 
@@ -56,6 +56,8 @@
     flex: none !important;
     display: flex !important;
     overflow: hidden !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
   }
 
   .quickDock > button:nth-child(1) { grid-column: 1 !important; }
@@ -63,23 +65,16 @@
   .quickDock > button:nth-child(3) { grid-column: 3 !important; }
   .quickDock > button:nth-child(4) { grid-column: 4 !important; }
   .quickDock > button:nth-child(5) { grid-column: 5 !important; }
-
-  /* El botón 6 es Tasas/Calculadora; en móvil se accede desde Más para evitar dos filas. */
-  .quickDock > button:nth-child(6) {
-    display: none !important;
-  }
-
-  .quickDock > button:nth-child(7) {
-    grid-column: 6 !important;
-  }
+  .quickDock > button:nth-child(6) { display: none !important; }
+  .quickDock > button:nth-child(7) { grid-column: 6 !important; }
 
   .quickDock button svg {
-    width: 18px !important;
-    height: 18px !important;
+    width: 17px !important;
+    height: 17px !important;
   }
 
   .quickDock button span {
-    font-size: .52rem !important;
+    font-size: .50rem !important;
     line-height: 1 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
@@ -108,51 +103,97 @@
   .quick-editor-active .quickCalculatorSheet,
   .quick-editor-active .quickMoreSheet {
     bottom: calc(8px + env(safe-area-inset-bottom)) !important;
-    max-height: calc(100dvh - 24px - env(safe-area-inset-bottom)) !important;
+    max-height: calc(100dvh - 18px - env(safe-area-inset-bottom)) !important;
   }
 
   .quickCalculatorSheet .quickSheetHead {
     position: sticky !important;
     top: -8px !important;
+    z-index: 20 !important;
+    margin-bottom: 8px !important;
+    padding-bottom: 8px !important;
+    background: rgba(255,255,255,.98) !important;
+  }
+
+  .quickSheetHead > button,
+  .quickMoreSheet header > button {
+    width: 40px !important;
+    height: 40px !important;
+    flex: 0 0 40px !important;
   }
 
   .quickCalculatorSheet .quickCalcWorkspace {
     grid-template-columns: 1fr !important;
   }
 
-  .quickCalculatorSheet .quickRates {
-    max-height: none !important;
+  .quickCalculatorSheet .quickCalcMain {
+    padding: 10px !important;
   }
 
-  /* En móvil también deben verse las tasas actuales, no solo los equivalentes. */
-  .quickCalculatorSheet .quickRateList,
-  .quickCalculatorSheet .quickEquivalentBlock {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 6px !important;
+  .quickCalculatorSheet .quickExpression input {
+    height: 44px !important;
   }
 
-  .quickCalculatorSheet .quickRateList > button,
-  .quickCalculatorSheet .quickEquivalentBlock > button {
-    min-height: 36px !important;
-    padding: 6px 8px !important;
+  .quickCalculatorSheet .quickResult {
+    margin-top: 7px !important;
+    padding: 9px 10px !important;
   }
 
-  .quickCalculatorSheet .quickRateList > button span,
-  .quickCalculatorSheet .quickRateList > button strong,
-  .quickCalculatorSheet .quickEquivalentBlock > button span,
-  .quickCalculatorSheet .quickEquivalentBlock > button strong {
-    font-size: .71rem !important;
+  .quickCalculatorSheet .quickResult > strong {
+    font-size: 1.34rem !important;
+  }
+
+  .quickCalculatorSheet .quickResultMeta {
+    font-size: .66rem !important;
+  }
+
+  .quickCalculatorSheet .quickSourceResult {
+    margin-top: 6px !important;
+    padding: 7px 9px !important;
+  }
+
+  .quickCalculatorSheet .quickCurrencyRow {
+    margin: 8px 0 !important;
+    align-items: flex-start !important;
+  }
+
+  .quickCalculatorSheet .quickCurrencyRow > div {
+    gap: 4px !important;
+  }
+
+  .quickCalculatorSheet .quickCurrencyRow button {
+    height: 27px !important;
+    padding: 0 7px !important;
+    font-size: .66rem !important;
+  }
+
+  /* En calculadora de precio no se necesita convertir desde VES. */
+  .quick-editor-active .quickCurrencyRow button:nth-child(2) {
+    display: none !important;
+  }
+
+  .quickCalculatorSheet .quickKeypad {
+    gap: 5px !important;
   }
 
   .quickCalculatorSheet .quickKeypad button {
-    height: 34px !important;
+    height: 35px !important;
+  }
+
+  .quickCalculatorSheet .quickApply {
+    min-height: 43px !important;
+    margin-top: 8px !important;
+  }
+
+  /* Dentro del editor de factura la calculadora debe ser compacta: sin lista de tasas ni equivalentes redundantes. */
+  .quick-editor-active .quickCalculatorSheet .quickRates {
+    display: none !important;
   }
 }
 
 @media (max-width: 390px) {
   .quickDock button span {
-    font-size: .49rem !important;
+    font-size: .47rem !important;
   }
 
   .quickCalculatorSheet,
@@ -165,11 +206,11 @@
 
   .quick-editor-active .quickCalculatorSheet,
   .quick-editor-active .quickMoreSheet {
-    max-height: calc(100dvh - 18px - env(safe-area-inset-bottom)) !important;
+    max-height: calc(100dvh - 14px - env(safe-area-inset-bottom)) !important;
   }
 
   .quickCalculatorSheet .quickKeypad button {
-    height: 32px !important;
+    height: 33px !important;
     font-size: .8rem !important;
   }
 }
