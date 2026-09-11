@@ -78,7 +78,11 @@ export interface Invoice {
   id?: number
   syncId?: string
   companyId?: number
+  originalCompanyId?: number
   logicalKey?: string
+  technicalDuplicateOf?: string
+  technicalDuplicateHiddenAt?: string
+  technicalDuplicateSignature?: string
   publicShareId?: string
   number: string
   type: InvoiceType
