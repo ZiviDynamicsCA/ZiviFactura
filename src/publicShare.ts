@@ -9,6 +9,17 @@ function shareId() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
 }
 
+function encodeCopyPayload(payload: unknown) {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload))
+  let binary = ''
+  bytes.forEach(byte => { binary += String.fromCharCode(byte) })
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+function localDocumentUrl(payload: unknown) {
+  return `${window.location.origin}/copiar.html#${encodeCopyPayload(payload)}`
+}
+
 function availablePaymentMethods(company: Company): PaymentDisplay[] {
   const methods: PaymentDisplay[] = []
   if (company.mobilePaymentBank || company.mobilePaymentPhone || company.mobilePaymentId) methods.push('mobile')
@@ -21,6 +32,7 @@ function availablePaymentMethods(company: Company): PaymentDisplay[] {
 function publicCompany(company: Company) {
   return {
     id: company.id,
+    syncId: company.syncId || '',
     name: company.name,
     taxId: company.taxId,
     phone: company.phone,
@@ -39,21 +51,20 @@ function publicCompany(company: Company) {
   }
 }
 
-export async function publishPublicDocument(invoice: Invoice, company: Company) {
-  const user = firebaseAuth?.currentUser
-  if (!firestore || !user) throw new Error('Inicia sesión para crear un enlace de pago.')
-  if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo por enlace.')
-
-  const id = invoice.publicShareId || shareId()
+function buildPublicPayload(invoice: Invoice, company: Company, ownerUid = 'local') {
   const documentTotals = totals(invoice)
   const visiblePayments = invoice.paymentMethodsVisible !== undefined
     ? invoice.paymentMethodsVisible
     : availablePaymentMethods(company)
-  const payload = {
-    version: 1,
+
+  return {
+    version: 2,
     active: true,
-    ownerUid: user.uid,
+    localOnly: ownerUid === 'local',
+    ownerUid,
     companyId: company.id,
+    companySyncId: company.syncId || '',
+    invoiceSyncId: invoice.syncId || '',
     invoiceNumber: invoice.number,
     invoiceType: invoice.type,
     status: invoice.status,
@@ -68,8 +79,12 @@ export async function publishPublicDocument(invoice: Invoice, company: Company) 
     client: {
       name: invoice.client.name || 'Cliente',
       taxId: invoice.client.taxId || '',
+      phone: invoice.client.phone || '',
+      email: invoice.client.email || '',
+      address: invoice.client.address || '',
     },
     items: invoice.items.map(item => ({
+      id: item.id,
       description: item.description,
       quantity: Number(item.quantity) || 0,
       unitPrice: Number(item.unitPrice) || 0,
@@ -83,17 +98,34 @@ export async function publishPublicDocument(invoice: Invoice, company: Company) 
     conversionTargets: invoice.conversionTargets || [],
     paymentMethodsVisible: visiblePayments,
     company: publicCompany(company),
-    updatedAt: serverTimestamp(),
+  }
+}
+
+export async function publishPublicDocument(invoice: Invoice, company: Company) {
+  if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo por enlace.')
+
+  const user = firebaseAuth?.currentUser || null
+  const id = invoice.publicShareId || shareId()
+  const payload = buildPublicPayload(invoice, company, user?.uid || 'local')
+
+  if (firestore && user) {
+    await setDoc(doc(firestore, 'publicDocuments', id), { ...payload, updatedAt: serverTimestamp() }, { merge: true })
+    if (!invoice.publicShareId) {
+      await db.invoices.update(invoice.id, { publicShareId: id, updatedAt: new Date().toISOString() })
+    }
+    return {
+      id,
+      url: `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`,
+      total: payload.total,
+    }
   }
 
-  await setDoc(doc(firestore, 'publicDocuments', id), payload, { merge: true })
-  if (!invoice.publicShareId) {
-    await db.invoices.update(invoice.id, { publicShareId: id, updatedAt: new Date().toISOString() })
-  }
+  // Fallback seguro para modo local: permite compartir una página autocontenida
+  // sin requerir sesión Firebase. No habilita carga de voucher en la nube.
   return {
-    id,
-    url: `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`,
-    total: documentTotals.total,
+    id: `local-${id}`,
+    url: localDocumentUrl({ ...payload, publicShareId: id }),
+    total: payload.total,
   }
 }
 
