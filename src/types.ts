@@ -1,6 +1,6 @@
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'cancelled'
 export type InvoiceType = 'Factura' | 'Proforma' | 'Presupuesto'
-export type RateSource = 'none' | 'bcv_usd' | 'bcv_eur' | 'binance' | 'usdt_average' | 'custom'
+export type RateSource = 'none' | 'bcv_usd' | 'bcv_eur' | 'bcv_average' | 'binance' | 'usdt_average' | 'custom'
 export type ConversionTarget = 'VES' | 'USD' | 'EUR' | 'USDT_BINANCE' | 'USDT_AVERAGE'
 export type PaymentDisplay = 'mobile' | 'bank' | 'binance' | 'notes'
 export type PaymentMethodKey = 'mobile' | 'transfer' | 'binance' | 'cash' | 'zelle' | 'card' | 'other'
