@@ -8,6 +8,11 @@ export type DuplicateRepairResult = {
   hidden: number
 }
 
+export type RestoreArchivedResult = {
+  invoices: number
+  payments: number
+}
+
 export type InvoiceDuplicateRepairResult = DuplicateRepairResult
 export type PaymentDuplicateRepairResult = DuplicateRepairResult
 
@@ -81,129 +86,81 @@ export function paymentTechnicalSignature(payment: Payment) {
   })
 }
 
-function invoiceRecordTime(invoice: Invoice) {
-  return Date.parse(invoice.updatedAt || invoice.createdAt || '') || 0
-}
-
-function paymentRecordTime(payment: Payment) {
-  return Date.parse(payment.updatedAt || payment.createdAt || '') || 0
-}
-
-function invoiceCanonicalScore(invoice: Invoice) {
-  let score = 0
-  if ((Number(invoice.companyId) || 1) > 0) score += 1_000_000
-  if (invoice.publicShareId && !invoice.publicShareId.startsWith('local-')) score += 25_000
-  if (invoice.syncId) score += 10_000
-  return score + invoiceRecordTime(invoice)
-}
-
-function paymentCanonicalScore(payment: Payment) {
-  let score = 0
-  if ((Number(payment.companyId) || 1) > 0) score += 1_000_000
-  if (payment.proofSubmissionId) score += 30_000
-  if (payment.syncId) score += 10_000
-  if (payment.key) score += 5_000
-  return score + paymentRecordTime(payment)
+function groupedCount<T>(rows: T[], signature: (row: T) => string) {
+  const groups = new Map<string, number>()
+  for (const row of rows) groups.set(signature(row), (groups.get(signature(row)) || 0) + 1)
+  return Array.from(groups.values()).filter(count => count > 1).length
 }
 
 export function isVisiblePayment(payment: Payment) {
   return (Number(payment.companyId) || 1) > 0 && !payment.technicalDuplicateOf
 }
 
+export async function restoreArchivedTechnicalRecords(): Promise<RestoreArchivedResult> {
+  const [invoices, payments] = await Promise.all([db.invoices.toArray(), db.payments.toArray()])
+  const archivedInvoices = invoices.filter(invoice => Number(invoice.companyId) < 0 || Boolean(invoice.technicalDuplicateOf))
+  const archivedPayments = payments.filter(payment => Number(payment.companyId) < 0 || Boolean(payment.technicalDuplicateOf))
+  let restoredInvoices = 0
+  let restoredPayments = 0
+  const now = new Date().toISOString()
+
+  await db.transaction('rw', db.invoices, db.payments, async () => {
+    for (const invoice of archivedInvoices) {
+      if (!invoice.id) continue
+      const restoredCompanyId = Math.abs(Number(invoice.originalCompanyId || invoice.companyId || 1)) || 1
+      await db.invoices.update(invoice.id, {
+        companyId: restoredCompanyId,
+        originalCompanyId: undefined,
+        technicalDuplicateOf: undefined,
+        technicalDuplicateHiddenAt: undefined,
+        technicalDuplicateSignature: undefined,
+        updatedAt: now,
+      } as Partial<Invoice>)
+      restoredInvoices += 1
+    }
+
+    for (const payment of archivedPayments) {
+      if (!payment.id) continue
+      const restoredCompanyId = Math.abs(Number(payment.originalCompanyId || payment.companyId || 1)) || 1
+      await db.payments.update(payment.id, {
+        companyId: restoredCompanyId,
+        originalCompanyId: undefined,
+        technicalDuplicateOf: undefined,
+        technicalDuplicateHiddenAt: undefined,
+        technicalDuplicateSignature: undefined,
+        updatedAt: now,
+      } as Partial<Payment>)
+      restoredPayments += 1
+    }
+  })
+
+  if (restoredInvoices || restoredPayments) {
+    window.dispatchEvent(new CustomEvent('zivifactura:integrity-restored', {
+      detail: { restoredInvoices, restoredPayments },
+    }))
+  }
+
+  return { invoices: restoredInvoices, payments: restoredPayments }
+}
+
+// Política de seguridad:
+// Estas funciones ya NO ocultan ni mueven registros automáticamente.
+// Solo analizan cuántos grupos duplicados existirían. Cualquier consolidación
+// deberá hacerse luego desde una pantalla manual con confirmación del usuario.
 export async function repairExactInvoiceDuplicates(): Promise<InvoiceDuplicateRepairResult> {
   const invoices = await db.invoices.toArray()
   const active = invoices.filter(invoice => {
     const companyId = Number(invoice.companyId) || 1
-    return companyId > 0 && !invoice.technicalDuplicateOf && Boolean(invoice.number?.trim())
+    return companyId > 0 && Boolean(invoice.number?.trim())
   })
-
-  const groups = new Map<string, Invoice[]>()
-  for (const invoice of active) {
-    const signature = invoiceTechnicalSignature(invoice)
-    const rows = groups.get(signature) || []
-    rows.push(invoice)
-    groups.set(signature, rows)
-  }
-
-  let hidden = 0
-  let duplicateGroups = 0
-  const now = new Date().toISOString()
-
-  await db.transaction('rw', db.invoices, async () => {
-    for (const [signature, rows] of groups.entries()) {
-      if (rows.length < 2) continue
-      duplicateGroups += 1
-      const [keeper, ...duplicates] = [...rows].sort((a, b) => invoiceCanonicalScore(b) - invoiceCanonicalScore(a))
-      const duplicateOf = keeper.syncId || `local-invoice-${keeper.id || keeper.number}`
-
-      for (const duplicate of duplicates) {
-        if (!duplicate.id) continue
-        const originalCompanyId = Number(duplicate.companyId) || 1
-        await db.invoices.update(duplicate.id, {
-          originalCompanyId,
-          companyId: -Math.abs(originalCompanyId),
-          technicalDuplicateOf: duplicateOf,
-          technicalDuplicateHiddenAt: now,
-          technicalDuplicateSignature: signature,
-          updatedAt: now,
-        } as Partial<Invoice>)
-        hidden += 1
-      }
-    }
-  })
-
-  if (hidden > 0) {
-    window.dispatchEvent(new CustomEvent('zivifactura:integrity-repaired', { detail: { hiddenInvoiceDuplicates: hidden } }))
-  }
-
-  return { scanned: invoices.length, groups: duplicateGroups, hidden }
+  return { scanned: invoices.length, groups: groupedCount(active, invoiceTechnicalSignature), hidden: 0 }
 }
 
 export async function repairExactPaymentDuplicates(): Promise<PaymentDuplicateRepairResult> {
   const payments = await db.payments.toArray()
   const active = payments.filter(payment => {
     const companyId = Number(payment.companyId) || 1
-    return companyId > 0 && !payment.technicalDuplicateOf && Boolean(payment.invoiceNumber?.trim())
+    return companyId > 0 && Boolean(payment.invoiceNumber?.trim())
   })
-
-  const groups = new Map<string, Payment[]>()
-  for (const payment of active) {
-    const signature = paymentTechnicalSignature(payment)
-    const rows = groups.get(signature) || []
-    rows.push(payment)
-    groups.set(signature, rows)
-  }
-
-  let hidden = 0
-  let duplicateGroups = 0
-  const now = new Date().toISOString()
-
-  await db.transaction('rw', db.payments, async () => {
-    for (const [signature, rows] of groups.entries()) {
-      if (rows.length < 2) continue
-      duplicateGroups += 1
-      const [keeper, ...duplicates] = [...rows].sort((a, b) => paymentCanonicalScore(b) - paymentCanonicalScore(a))
-      const duplicateOf = keeper.syncId || keeper.key || `local-payment-${keeper.id || keeper.invoiceNumber}`
-
-      for (const duplicate of duplicates) {
-        if (!duplicate.id) continue
-        const originalCompanyId = Number(duplicate.companyId) || 1
-        await db.payments.update(duplicate.id, {
-          originalCompanyId,
-          companyId: -Math.abs(originalCompanyId),
-          technicalDuplicateOf: duplicateOf,
-          technicalDuplicateHiddenAt: now,
-          technicalDuplicateSignature: signature,
-          updatedAt: now,
-        } as Partial<Payment>)
-        hidden += 1
-      }
-    }
-  })
-
-  if (hidden > 0) {
-    window.dispatchEvent(new CustomEvent('zivifactura:integrity-repaired', { detail: { hiddenPaymentDuplicates: hidden } }))
-  }
-
-  return { scanned: payments.length, groups: duplicateGroups, hidden }
+  return { scanned: payments.length, groups: groupedCount(active, paymentTechnicalSignature), hidden: 0 }
 }
