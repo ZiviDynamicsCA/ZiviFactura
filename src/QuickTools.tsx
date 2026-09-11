@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BarChart3, Calculator, Copy, DollarSign, FilePlus2, MoreHorizontal, ReceiptText, RefreshCw, Settings, Wallet, WalletCards, X } from 'lucide-react'
-import { fetchLiveRates, getCachedRates, refreshRatesIfDue, type LiveRates } from './rates'
+import { bcvAverageRate, fetchLiveRates, getCachedRates, refreshRatesIfDue, type LiveRates } from './rates'
 import './quick-tools.css'
 import './quick-mobile-fixes.css'
 
 type WorkspaceKey = 'billing' | 'receivables' | 'payments' | 'income' | 'stats'
-type CalcCurrency = 'USD' | 'VES' | 'EUR' | 'USDT'
+type CalcCurrency = 'USD' | 'VES' | 'EUR' | 'BCV_AVERAGE' | 'USDT'
 
 const workspaceOrder: WorkspaceKey[] = ['billing', 'receivables', 'payments', 'income', 'stats']
-const calcCurrencies: CalcCurrency[] = ['USD', 'VES', 'EUR', 'USDT']
+const calcCurrencies: CalcCurrency[] = ['USD', 'VES', 'EUR', 'BCV_AVERAGE', 'USDT']
 const keypad = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '-', '0', ',', '%', '+', '⌫', '(', ')', '=']
 
 function normalizeExpression(raw: string) {
@@ -93,9 +93,16 @@ function plain(value: number, digits = 2) {
   return Number(value).toLocaleString('es-VE', { useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 
+function currencyButtonLabel(currency: CalcCurrency) {
+  if (currency === 'BCV_AVERAGE') return 'BCV prom.'
+  return currency
+}
+
 function formatValue(value: number, currency: CalcCurrency) {
   if (!Number.isFinite(value)) return 'N/D'
-  return currency === 'VES' ? `Bs ${locale(value)}` : `${locale(value)} ${currency}`
+  if (currency === 'VES') return `Bs ${locale(value)}`
+  if (currency === 'BCV_AVERAGE') return `${locale(value)} BCV prom.`
+  return `${locale(value)} ${currency}`
 }
 
 async function copyNumber(value: number) {
@@ -118,13 +125,15 @@ function rateForCurrency(currency: CalcCurrency, rates: LiveRates | null) {
   if (currency === 'VES') return 1
   if (currency === 'USD') return Number(rates?.usdBcv) || 0
   if (currency === 'EUR') return Number(rates?.eurBcv) || 0
-  return Number(rates?.binanceBuy || rates?.usdtAverage) || 0
+  if (currency === 'BCV_AVERAGE') return bcvAverageRate(rates)
+  return Number(rates?.usdtAverage || rates?.binanceBuy) || 0
 }
 
 function rateName(currency: CalcCurrency) {
-  if (currency === 'USD') return 'USD BCV'
-  if (currency === 'EUR') return 'EUR BCV'
-  if (currency === 'USDT') return 'USDT Binance'
+  if (currency === 'USD') return 'BCV dólar'
+  if (currency === 'EUR') return 'BCV euro'
+  if (currency === 'BCV_AVERAGE') return 'Promedio BCV USD/EUR'
+  if (currency === 'USDT') return 'USDT promedio'
   return 'VES'
 }
 
@@ -197,13 +206,14 @@ export default function QuickTools() {
   const isPriceCalculator = Boolean(contextInput)
   const previewCurrency: CalcCurrency = currency === 'VES' ? 'USD' : 'VES'
   const previewValue = result == null ? null : convert(result, currency, previewCurrency, rates)
-  const primaryLabel = previewCurrency === 'VES' ? 'Equivalente en bolívares' : 'Equivalente en dólares'
+  const valueToApply = isPriceCalculator ? previewValue : result
+  const primaryLabel = previewCurrency === 'VES' ? 'Conversión que se aplicará en precio unitario' : 'Conversión que se aplicará en precio unitario'
   const sourceRate = rateForCurrency(currency, rates)
   const primaryMeta = result != null
     ? previewValue == null
-      ? 'Actualiza las tasas para poder mostrar la conversión.'
+      ? 'Actualiza las tasas para poder mostrar y aplicar la conversión.'
       : isPriceCalculator
-        ? `Precio original: ${formatValue(result, currency)} · ${rateName(currency)} ${currency === 'VES' ? '' : sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
+        ? `Monto escrito: ${formatValue(result, currency)} · ${rateName(currency)} ${currency === 'VES' ? '' : sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
         : `Base: ${formatValue(result, currency)} · ${rateName(currency)} ${currency === 'VES' ? '' : sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
     : ''
 
@@ -241,8 +251,8 @@ export default function QuickTools() {
         const button = document.createElement('button')
         button.type = 'button'
         button.className = 'inlineCalcButton'
-        button.title = 'Calcular precio sin salir de la factura'
-        button.setAttribute('aria-label', 'Abrir calculadora para este precio')
+        button.title = 'Convertir precio sin salir de la factura'
+        button.setAttribute('aria-label', 'Abrir calculadora para convertir este precio')
         button.textContent = '🧮'
         button.addEventListener('click', event => {
           event.preventDefault()
@@ -312,18 +322,19 @@ export default function QuickTools() {
   }
 
   function applyResult() {
-    if (result == null || !contextInput) return
-    setReactInputValue(contextInput, result)
+    if (valueToApply == null || !contextInput) return
+    setReactInputValue(contextInput, valueToApply)
     closeSheets()
   }
 
   if (!available && !calculatorOpen) return null
 
   const rateRows = [
-    { label: 'USD · BCV', value: Number(rates?.usdBcv) || 0 },
-    { label: 'EUR · BCV', value: Number(rates?.eurBcv) || 0 },
-    { label: 'USDT · Binance', value: Number(rates?.binanceBuy) || 0 },
-    { label: 'USDT · Promedio', value: Number(rates?.usdtAverage) || 0 },
+    { label: 'BCV dólar', value: Number(rates?.usdBcv) || 0 },
+    { label: 'BCV euro', value: Number(rates?.eurBcv) || 0 },
+    { label: 'Promedio BCV USD/EUR', value: bcvAverageRate(rates) },
+    { label: 'USDT Binance', value: Number(rates?.binanceBuy) || 0 },
+    { label: 'USDT promedio', value: Number(rates?.usdtAverage) || 0 },
   ].filter(row => row.value > 0)
 
   return <>
@@ -332,7 +343,7 @@ export default function QuickTools() {
     {calculatorOpen && <section className="quickCalculatorSheet" aria-label="Calculadora rápida">
       <div className="quickSheetHandle"/>
       <header className="quickSheetHead">
-        <div><span>HERRAMIENTA RÁPIDA</span><h2>{contextTitle}</h2><p>{isPriceCalculator ? 'Calcula el precio unitario y visualiza su equivalente de cobro sin salir de la factura.' : 'Calcula, convierte con tasas actuales y copia resultados.'}</p></div>
+        <div><span>HERRAMIENTA RÁPIDA</span><h2>{contextTitle}</h2><p>{isPriceCalculator ? 'Escribe con el teclado interno, revisa la conversión y aplícala directamente al precio unitario.' : 'Calcula, convierte con tasas actuales y copia resultados.'}</p></div>
         <button type="button" onClick={closeSheets} aria-label="Cerrar calculadora"><X size={20}/></button>
       </header>
 
@@ -342,9 +353,9 @@ export default function QuickTools() {
             <span>Operación</span>
             <input readOnly inputMode="none" aria-readonly="true" value={expression} onFocus={event => event.currentTarget.blur()} onPointerDown={event => event.preventDefault()} placeholder="Usa los botones de la calculadora"/>
           </label>
-          <div className="quickResult"><span>{primaryLabel}</span><strong>{previewValue == null ? '—' : formatValue(previewValue, previewCurrency)}</strong><button type="button" disabled={previewValue == null} onClick={() => previewValue != null && void copyNumber(previewValue)}><Copy size={16}/>Copiar</button>{primaryMeta && <small className="quickResultMeta">{primaryMeta}</small>}</div>
-          {isPriceCalculator && result != null && <div className="quickSourceResult"><span>Valor que se aplicará al precio unitario</span><strong>{formatValue(result, currency)}</strong></div>}
-          <div className="quickCurrencyRow"><span>Moneda del cálculo</span><div>{calcCurrencies.map(item => <button type="button" className={currency === item ? 'active' : ''} key={item} onClick={() => setCurrency(item)}>{item}</button>)}</div></div>
+          <div className="quickResult"><span>{isPriceCalculator ? primaryLabel : (previewCurrency === 'VES' ? 'Equivalente en bolívares' : 'Equivalente en dólares')}</span><strong>{previewValue == null ? '—' : formatValue(previewValue, previewCurrency)}</strong><button type="button" disabled={previewValue == null} onClick={() => previewValue != null && void copyNumber(previewValue)}><Copy size={16}/>Copiar</button>{primaryMeta && <small className="quickResultMeta">{primaryMeta}</small>}</div>
+          {isPriceCalculator && result != null && <div className="quickSourceResult"><span>Monto escrito / resultado original</span><strong>{formatValue(result, currency)}</strong></div>}
+          <div className="quickCurrencyRow"><span>Moneda del cálculo</span><div>{calcCurrencies.map(item => <button type="button" className={currency === item ? 'active' : ''} key={item} onClick={() => setCurrency(item)}>{currencyButtonLabel(item)}</button>)}</div></div>
           <div className="quickKeypad">
             {keypad.map(key => <button type="button" key={key} className={['÷', '×', '-', '+', '='].includes(key) ? 'operator' : ''} onClick={() => {
               if (key === '⌫') return setExpression(current => current.slice(0, -1))
@@ -352,13 +363,13 @@ export default function QuickTools() {
               append(key)
             }}>{key}</button>)}
           </div>
-          {isPriceCalculator && <button type="button" className="quickApply" disabled={result == null} onClick={applyResult}><Calculator size={18}/>Usar resultado como precio unitario</button>}
+          {isPriceCalculator && <button type="button" className="quickApply" disabled={valueToApply == null} onClick={applyResult}><Calculator size={18}/>Usar conversión como precio unitario</button>}
         </div>
 
         <aside className="quickRates">
           <div className="quickRatesHead"><div><span>TASAS ACTUALES</span><strong>Consulta y copia</strong></div><button type="button" disabled={loadingRates} onClick={() => void refreshRates()} title="Actualizar tasas"><RefreshCw size={17} className={loadingRates ? 'spin' : ''}/></button></div>
           <div className="quickRateList">{rateRows.length ? rateRows.map(row => <button type="button" key={row.label} onClick={() => void copyNumber(row.value)}><span>{row.label}</span><strong>{locale(row.value)} Bs</strong><Copy size={14}/></button>) : <p>No hay tasas disponibles. Pulsa actualizar.</p>}</div>
-          {result != null && <div className="quickEquivalentBlock"><span>EQUIVALENTES DEL RESULTADO</span>{equivalents.filter(item => item.currency !== currency).map(item => <button type="button" key={item.currency} onClick={() => void copyNumber(item.value)}><span>{item.currency}</span><strong>{formatValue(item.value, item.currency)}</strong><Copy size={14}/></button>)}</div>}
+          {result != null && <div className="quickEquivalentBlock"><span>EQUIVALENTES DEL RESULTADO</span>{equivalents.filter(item => item.currency !== currency).map(item => <button type="button" key={item.currency} onClick={() => void copyNumber(item.value)}><span>{currencyButtonLabel(item.currency)}</span><strong>{formatValue(item.value, item.currency)}</strong><Copy size={14}/></button>)}</div>}
         </aside>
       </div>
     </section>}
