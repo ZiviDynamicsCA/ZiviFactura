@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import AuthShell from './AuthShell'
+import BusinessProfileModule from './BusinessProfileModule'
 import EducationModule from './EducationModule'
 import HelpCenter from './HelpCenter'
 import InstallPrompt from './InstallPrompt'
@@ -34,7 +35,7 @@ type PwaWindow = Window & {
 }
 
 const pwaWindow = window as PwaWindow
-const PWA_RESET_KEY = 'zivifactura.pwa-reset-v38'
+const PWA_RESET_KEY = 'zivifactura.pwa-reset-v39'
 
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault()
@@ -151,6 +152,7 @@ async function bootstrap() {
       <ZiviChrome />
       <QuickTools />
       <ModuleBridge />
+      <BusinessProfileModule />
       <EducationModule />
       <HelpCenter />
       <InstallPrompt />
