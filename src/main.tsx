@@ -33,7 +33,7 @@ type PwaWindow = Window & {
 }
 
 const pwaWindow = window as PwaWindow
-const PWA_RESET_KEY = 'zivifactura.pwa-reset-v32'
+const PWA_RESET_KEY = 'zivifactura.pwa-reset-v33'
 
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault()
