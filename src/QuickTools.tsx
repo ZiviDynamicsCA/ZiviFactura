@@ -7,6 +7,8 @@ type WorkspaceKey = 'billing' | 'receivables' | 'payments' | 'income' | 'stats'
 type CalcCurrency = 'USD' | 'VES' | 'EUR' | 'USDT'
 
 const workspaceOrder: WorkspaceKey[] = ['billing', 'receivables', 'payments', 'income', 'stats']
+const calcCurrencies: CalcCurrency[] = ['USD', 'VES', 'EUR', 'USDT']
+const keypad = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '-', '0', ',', '%', '+', '⌫', '(', ')', '=']
 
 function normalizeExpression(raw: string) {
   return raw.replace(/,/g, '.').replace(/×/g, '*').replace(/÷/g, '/').replace(/\s+/g, '')
@@ -136,7 +138,7 @@ function detectInvoiceCurrency(): CalcCurrency {
     return values.includes('USD') && values.includes('VES') && values.includes('EUR')
   })
   const value = currencySelect?.value as CalcCurrency | undefined
-  return value && ['USD', 'VES', 'EUR', 'USDT'].includes(value) ? value : 'USD'
+  return value && calcCurrencies.includes(value) ? value : 'USD'
 }
 
 function setReactInputValue(input: HTMLInputElement, value: number) {
@@ -165,7 +167,10 @@ function clickAppMode(label: 'Inicio' | 'Tasas' | 'Configuración') {
 
 function clickNewDocument() {
   clickWorkspace('billing')
-  window.setTimeout(() => document.querySelector<HTMLButtonElement>('.top > .primary')?.click(), 60)
+  window.setTimeout(() => {
+    const candidates = Array.from(document.querySelectorAll<HTMLButtonElement>('.top > .primary, .heroButton, .documentBoardIntro .primary'))
+    candidates.find(button => /nueva|nuevo|crear/i.test(button.textContent || ''))?.click()
+  }, 60)
 }
 
 export default function QuickTools() {
@@ -182,23 +187,28 @@ export default function QuickTools() {
   const observerRef = useRef<MutationObserver | null>(null)
 
   const result = useMemo(() => evaluateExpression(expression), [expression])
+  const isPriceCalculator = Boolean(contextInput)
+  const previewCurrency: CalcCurrency = currency === 'VES' ? 'USD' : 'VES'
+  const previewValue = result == null ? null : convert(result, currency, previewCurrency, rates)
+  const primaryLabel = previewCurrency === 'VES' ? 'Equivalente en bolívares' : 'Equivalente en dólares'
+  const sourceRate = rateForCurrency(currency, rates)
+  const primaryMeta = result != null
+    ? previewValue == null
+      ? 'Actualiza las tasas para poder mostrar la conversión.'
+      : isPriceCalculator
+        ? `Precio unitario original: ${formatValue(result, currency)} · ${rateName(currency)} ${currency === 'VES' ? '' : sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
+        : `Base: ${formatValue(result, currency)} · ${rateName(currency)} ${currency === 'VES' ? '' : sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
+    : ''
+
   const equivalents = useMemo(() => {
     if (result == null) return [] as Array<{ currency: CalcCurrency; value: number }>
-    return (['VES', 'USD', 'EUR', 'USDT'] as CalcCurrency[]).map(target => {
-      const value = convert(result, currency, target, rates)
-      return value == null ? null : { currency: target, value }
-    }).filter(Boolean) as Array<{ currency: CalcCurrency; value: number }>
+    return calcCurrencies
+      .map(target => {
+        const value = convert(result, currency, target, rates)
+        return value == null ? null : { currency: target, value }
+      })
+      .filter(Boolean) as Array<{ currency: CalcCurrency; value: number }>
   }, [result, currency, rates])
-
-  const primaryCurrency: CalcCurrency = contextInput ? currency : currency === 'VES' ? 'USD' : 'VES'
-  const primaryValue = result == null ? null : contextInput ? result : convert(result, currency, primaryCurrency, rates)
-  const sourceRate = rateForCurrency(currency, rates)
-  const primaryLabel = contextInput ? 'Resultado del cálculo' : primaryCurrency === 'VES' ? 'Equivalente en bolívares' : 'Equivalente en dólares'
-  const primaryMeta = !contextInput && result != null
-    ? currency === 'VES'
-      ? `Base: ${formatValue(result, currency)} · Conversión con ${rateName(primaryCurrency)}`
-      : `Base: ${formatValue(result, currency)} · Tasa ${rateName(currency)} ${sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
-    : ''
 
   useEffect(() => {
     const sync = () => {
@@ -274,6 +284,7 @@ export default function QuickTools() {
   function navigate(workspace: WorkspaceKey) {
     setCalculatorOpen(false)
     setMoreOpen(false)
+    setContextInput(null)
     clickWorkspace(workspace)
     if (workspace === 'billing') window.setTimeout(() => clickAppMode('Inicio'), 10)
     window.setTimeout(() => setActiveWorkspace(workspace), 80)
@@ -283,11 +294,16 @@ export default function QuickTools() {
     setExpression(current => `${current}${value}`)
   }
 
+  function closeSheets() {
+    setCalculatorOpen(false)
+    setMoreOpen(false)
+    setContextInput(null)
+  }
+
   function applyResult() {
     if (result == null || !contextInput) return
     setReactInputValue(contextInput, result)
-    setCalculatorOpen(false)
-    setContextInput(null)
+    closeSheets()
   }
 
   if (!available) return null
@@ -300,55 +316,58 @@ export default function QuickTools() {
   ].filter(row => row.value > 0)
 
   return <>
-    {(calculatorOpen || moreOpen) && <button className="quickBackdrop" aria-label="Cerrar" onClick={() => { setCalculatorOpen(false); setMoreOpen(false); setContextInput(null) }}/>} 
+    {(calculatorOpen || moreOpen) && <button className="quickBackdrop" aria-label="Cerrar panel rápido" onClick={closeSheets}/>} 
 
     {calculatorOpen && <section className="quickCalculatorSheet" aria-label="Calculadora rápida">
       <div className="quickSheetHandle"/>
-      <header className="quickSheetHead"><div><span>HERRAMIENTA RÁPIDA</span><h2>{contextTitle}</h2><p>Calcula, convierte con las tasas actuales y copia el resultado sin abandonar tu trabajo.</p></div><button onClick={() => { setCalculatorOpen(false); setContextInput(null) }} aria-label="Cerrar calculadora"><X size={20}/></button></header>
+      <header className="quickSheetHead">
+        <div><span>HERRAMIENTA RÁPIDA</span><h2>{contextTitle}</h2><p>{isPriceCalculator ? 'Calcula el precio unitario y visualiza su equivalente de cobro sin salir de la factura.' : 'Calcula, convierte con tasas actuales y copia resultados.'}</p></div>
+        <button type="button" onClick={closeSheets} aria-label="Cerrar calculadora"><X size={20}/></button>
+      </header>
 
       <div className="quickCalcWorkspace">
         <div className="quickCalcMain">
           <label className="quickExpression"><span>Operación</span><input autoFocus inputMode="decimal" value={expression} onChange={event => setExpression(event.target.value)} placeholder="Ej. 4,80 × 150"/></label>
-          <div className="quickResult"><span>{primaryLabel}</span><strong>{primaryValue == null ? '—' : formatValue(primaryValue, primaryCurrency)}</strong><button disabled={primaryValue == null} onClick={() => primaryValue != null && void copyNumber(primaryValue)}><Copy size={16}/>Copiar</button>{primaryMeta && <small className="quickResultMeta">{primaryMeta}</small>}</div>
-          <div className="quickCurrencyRow"><span>Moneda del cálculo</span><div>{(['USD', 'VES', 'EUR', 'USDT'] as CalcCurrency[]).map(item => <button className={currency === item ? 'active' : ''} key={item} onClick={() => setCurrency(item)}>{item}</button>)}</div></div>
+          <div className="quickResult"><span>{primaryLabel}</span><strong>{previewValue == null ? '—' : formatValue(previewValue, previewCurrency)}</strong><button type="button" disabled={previewValue == null} onClick={() => previewValue != null && void copyNumber(previewValue)}><Copy size={16}/>Copiar</button>{primaryMeta && <small className="quickResultMeta">{primaryMeta}</small>}</div>
+          {isPriceCalculator && result != null && <div className="quickSourceResult"><span>Valor que se aplicará al precio unitario</span><strong>{formatValue(result, currency)}</strong></div>}
+          <div className="quickCurrencyRow"><span>Moneda del cálculo</span><div>{calcCurrencies.map(item => <button type="button" className={currency === item ? 'active' : ''} key={item} onClick={() => setCurrency(item)}>{item}</button>)}</div></div>
           <div className="quickKeypad">
-            {['7','8','9','÷','4','5','6','×','1','2','3','-','0',',','%','+','(',')','⌫','='].map(key => <button key={key} className={['÷','×','-','+','='].includes(key) ? 'operator' : ''} onClick={() => {
+            {keypad.map(key => <button type="button" key={key} className={['÷', '×', '-', '+', '='].includes(key) ? 'operator' : ''} onClick={() => {
               if (key === '⌫') return setExpression(current => current.slice(0, -1))
               if (key === '=') return result != null ? setExpression(String(Number(result.toFixed(8))).replace('.', ',')) : undefined
               append(key)
             }}>{key}</button>)}
           </div>
-          {contextInput && <button className="quickApply" disabled={result == null} onClick={applyResult}><Calculator size={18}/>Usar resultado como precio unitario</button>}
+          {isPriceCalculator && <button type="button" className="quickApply" disabled={result == null} onClick={applyResult}><Calculator size={18}/>Usar resultado como precio unitario</button>}
         </div>
 
         <aside className="quickRates">
-          <div className="quickRatesHead"><div><span>TASAS ACTUALES</span><strong>Consulta y copia</strong></div><button disabled={loadingRates} onClick={() => void refreshRates()} title="Actualizar tasas"><RefreshCw size={17} className={loadingRates ? 'spin' : ''}/></button></div>
-          <div className="quickRateList">{rateRows.length ? rateRows.map(row => <button key={row.label} onClick={() => void copyNumber(row.value)}><span>{row.label}</span><strong>{locale(row.value)} Bs</strong><Copy size={14}/></button>) : <p>No hay tasas disponibles en caché. Pulsa actualizar.</p>}</div>
-          {result != null && <div className="quickEquivalentBlock"><span>EQUIVALENTES DEL RESULTADO</span>{equivalents.filter(item => item.currency !== currency).map(item => <button key={item.currency} onClick={() => void copyNumber(item.value)}><span>{item.currency}</span><strong>{formatValue(item.value, item.currency)}</strong><Copy size={14}/></button>)}</div>}
+          <div className="quickRatesHead"><div><span>TASAS ACTUALES</span><strong>Consulta y copia</strong></div><button type="button" disabled={loadingRates} onClick={() => void refreshRates()} title="Actualizar tasas"><RefreshCw size={17} className={loadingRates ? 'spin' : ''}/></button></div>
+          <div className="quickRateList">{rateRows.length ? rateRows.map(row => <button type="button" key={row.label} onClick={() => void copyNumber(row.value)}><span>{row.label}</span><strong>{locale(row.value)} Bs</strong><Copy size={14}/></button>) : <p>No hay tasas disponibles en caché. Pulsa actualizar.</p>}</div>
+          {result != null && <div className="quickEquivalentBlock"><span>EQUIVALENTES DEL RESULTADO</span>{equivalents.filter(item => item.currency !== currency).map(item => <button type="button" key={item.currency} onClick={() => void copyNumber(item.value)}><span>{item.currency}</span><strong>{formatValue(item.value, item.currency)}</strong><Copy size={14}/></button>)}</div>}
         </aside>
       </div>
     </section>}
 
     {moreOpen && <section className="quickMoreSheet">
       <div className="quickSheetHandle"/>
-      <header><div><span>MÁS HERRAMIENTAS</span><h2>Administración y configuración</h2></div><button onClick={() => setMoreOpen(false)} aria-label="Cerrar"><X size={19}/></button></header>
+      <header><div><span>MÁS HERRAMIENTAS</span><h2>Administración y configuración</h2></div><button type="button" onClick={closeSheets} aria-label="Cerrar"><X size={19}/></button></header>
       <div className="quickMoreGrid">
-        <button onClick={() => { setMoreOpen(false); navigate('stats') }}><BarChart3/><span><strong>Estadísticas</strong><small>Distribución y métodos de pago</small></span></button>
-        <button onClick={() => { setMoreOpen(false); clickAppMode('Configuración') }}><Settings/><span><strong>Configuración</strong><small>Datos del negocio y cobro</small></span></button>
-        <button onClick={() => { setMoreOpen(false); clickAppMode('Tasas') }}><Calculator/><span><strong>Panel de tasas</strong><small>Vista completa de BCV y USDT</small></span></button>
-        <button onClick={() => { setMoreOpen(false); document.querySelector<HTMLButtonElement>('.businessSwitcher button')?.click() }}><FilePlus2/><span><strong>Agregar negocio</strong><small>Otra empresa o emprendimiento</small></span></button>
+        <button type="button" onClick={() => { setMoreOpen(false); navigate('stats') }}><BarChart3/><span><strong>Estadísticas</strong><small>Distribución y métodos de pago</small></span></button>
+        <button type="button" onClick={() => { setMoreOpen(false); clickAppMode('Configuración') }}><Settings/><span><strong>Configuración</strong><small>Datos del negocio y cobro</small></span></button>
+        <button type="button" onClick={() => { setMoreOpen(false); clickAppMode('Tasas') }}><Calculator/><span><strong>Panel de tasas</strong><small>Vista completa de BCV y USDT</small></span></button>
+        <button type="button" onClick={() => { setMoreOpen(false); document.querySelector<HTMLButtonElement>('.businessSwitcher button')?.click() }}><FilePlus2/><span><strong>Agregar negocio</strong><small>Otra empresa o emprendimiento</small></span></button>
       </div>
     </section>}
 
-    <button className="quickFab" onClick={clickNewDocument} aria-label="Nueva factura"><FilePlus2 size={22}/><span>Nueva</span></button>
-
     <nav className="quickDock" aria-label="Navegación principal">
-      <button className={activeWorkspace === 'billing' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('billing')}><ReceiptText/><span>Inicio</span></button>
-      <button className={activeWorkspace === 'receivables' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('receivables')}><DollarSign/><span>Por cobrar</span></button>
-      <button className={activeWorkspace === 'payments' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('payments')}><WalletCards/><span>Cobros</span></button>
-      <button className={activeWorkspace === 'income' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('income')}><Wallet/><span>Ingresos</span></button>
-      <button className={calculatorOpen ? 'active tool' : 'tool'} onClick={openGlobalCalculator}><Calculator/><span>Tasas</span></button>
-      <button className={moreOpen ? 'active' : ''} onClick={() => { setCalculatorOpen(false); setMoreOpen(value => !value) }}><MoreHorizontal/><span>Más</span></button>
+      <button type="button" className={activeWorkspace === 'billing' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('billing')}><ReceiptText/><span>Inicio</span></button>
+      <button type="button" className={activeWorkspace === 'receivables' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('receivables')}><DollarSign/><span>Por cobrar</span></button>
+      <button type="button" className={activeWorkspace === 'payments' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('payments')}><WalletCards/><span>Cobros</span></button>
+      <button type="button" className="quickDockCreate" onClick={clickNewDocument} aria-label="Nueva factura"><FilePlus2/><span>Nueva</span></button>
+      <button type="button" className={activeWorkspace === 'income' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('income')}><Wallet/><span>Ingresos</span></button>
+      <button type="button" className={calculatorOpen ? 'active tool' : 'tool'} onClick={openGlobalCalculator}><Calculator/><span>Tasas</span></button>
+      <button type="button" className={moreOpen ? 'active' : ''} onClick={() => { setCalculatorOpen(false); setContextInput(null); setMoreOpen(value => !value) }}><MoreHorizontal/><span>Más</span></button>
     </nav>
   </>
 }
