@@ -67,7 +67,12 @@ const makeId = () => typeof crypto !== 'undefined' && crypto.randomUUID
   : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
 
 const f = (key: string, label: string, type: FieldType, required = false, extra: Partial<EducationField> = {}): EducationField => ({
-  id: makeId(), key, label, type, required, ...extra,
+  id: makeId(),
+  key,
+  label,
+  type,
+  required,
+  ...extra,
 })
 
 function enrollmentTemplate(companyId: number): EducationForm {
@@ -76,37 +81,41 @@ function enrollmentTemplate(companyId: number): EducationForm {
     key: `enrollment-${companyId}-${Date.now().toString(36)}`,
     companyId,
     title: 'Planilla de inscripción',
-    description: 'Completa la información del estudiante y de su representante. Los campos marcados como obligatorios deben ser respondidos antes de enviar la planilla.',
+    description: 'Completa la información del estudiante y de su representante. El centro revisará la solicitud y te contactará para confirmar el proceso administrativo.',
     kind: 'enrollment',
     active: false,
     createdAt,
     updatedAt: createdAt,
     fields: [
       f('student_section', 'Datos del estudiante', 'section'),
-      f('email', 'Correo electrónico', 'email', true, { placeholder: 'correo@ejemplo.com' }),
+      f('email', 'Correo electrónico del representante', 'email', true, { placeholder: 'correo@ejemplo.com' }),
       f('studentName', 'Nombre y apellidos del estudiante', 'text', true),
       f('birthDate', 'Fecha de nacimiento', 'date', true),
-      f('gradeSchool', 'Grado que cursa y colegio de procedencia', 'text', true),
+      f('studentId', 'Cédula escolar / documento del estudiante', 'text', false),
+      f('gradeSchool', 'Grado a cursar y colegio de procedencia', 'text', true),
       f('address', 'Dirección de habitación', 'textarea', true),
 
-      f('academic_section', 'Necesidades académicas', 'section'),
-      f('supportAreas', 'Describa brevemente en qué áreas o asignaturas necesita apoyo su hijo(a)', 'textarea', true),
-      f('serviceReasons', 'Describa brevemente las razones por las que solicita nuestros servicios', 'textarea', true),
-      f('learningDiagnosis', '¿Tiene algún diagnóstico de aprendizaje? Si la respuesta es positiva, indique qué especialista apoyó en el proceso y recuerde consignar copia del informe.', 'textarea', false),
-
       f('guardian_section', 'Representante y responsable de pago', 'section'),
-      f('representativeNameId', 'Nombre, apellido del representante y número de cédula', 'text', true),
-      f('payerNameId', 'Nombre, apellido y número de cédula de la persona responsable del pago', 'text', true),
-      f('payerPhone', 'Número de teléfono de contacto de la persona responsable del pago de mensualidades', 'phone', true),
-      f('workplaceRole', 'Lugar de trabajo y cargo', 'text', false),
-      f('homeContext', '¿Quién(es) vive(n) con el niño? Explique brevemente con quién pasa mayor tiempo su representante.', 'textarea', false),
-      f('contactInfo', 'Indique su información de contacto: teléfono celular y correo electrónico', 'textarea', true),
-      f('workInfo', 'Indique su información laboral: ocupación y dirección de trabajo', 'textarea', false),
+      f('representativeNameId', 'Nombre, apellido y cédula del representante', 'text', true),
+      f('payerNameId', 'Nombre, apellido y cédula de la persona responsable del pago', 'text', true),
+      f('payerPhone', 'Teléfono de contacto para mensualidades', 'phone', true),
+      f('contactInfo', 'Teléfono alternativo y correo adicional', 'textarea', false),
+      f('workInfo', 'Ocupación, empresa y dirección de trabajo', 'textarea', false),
+
+      f('academic_section', 'Información académica y familiar', 'section'),
+      f('supportAreas', 'Áreas o asignaturas donde necesita apoyo', 'textarea', false),
+      f('learningDiagnosis', 'Diagnóstico de aprendizaje o informe profesional, si aplica', 'textarea', false),
+      f('homeContext', 'Personas con quienes vive el estudiante y observaciones familiares importantes', 'textarea', false),
+
+      f('billing_section', 'Datos administrativos', 'section'),
+      f('enrollmentPlan', 'Modalidad de inscripción', 'select', true, { options: ['Inscripción regular', 'Inscripción + primera mensualidad', 'Mensualidad', 'Reingreso'] }),
+      f('paymentResponsible', '¿Quién recibirá las facturas y avisos de pago?', 'text', true),
+      f('lateFeeAccepted', 'Acepta las condiciones de mora por retraso de pago', 'radio', true, { options: ['Sí', 'No'] }),
 
       f('health_section', 'Salud y autorizaciones', 'section'),
-      f('healthHistory', 'Indique algún historial de salud importante: condición médica especial, alergias alimentarias o a medicamentos y medicamentos que toma actualmente.', 'textarea', false),
-      f('authorizedPickup', 'Indique las personas autorizadas para retirar a su representado: nombre y apellido, número de cédula y parentesco.', 'textarea', true),
-      f('authorization', 'Autorizo al centro educativo a tomar fotografías, videos y audios de mi representado durante las actividades pedagógicas, culturales y de recreación, para fines institucionales y bajo uso responsable.', 'radio', true, { options: ['Sí', 'No'] }),
+      f('healthHistory', 'Condición médica, alergias o medicamentos importantes', 'textarea', false),
+      f('authorizedPickup', 'Personas autorizadas para retirar al estudiante', 'textarea', true),
+      f('authorization', 'Autorizo el uso responsable de fotografías, videos y audios en actividades institucionales', 'radio', true, { options: ['Sí', 'No'] }),
     ],
   }
 }
@@ -117,6 +126,7 @@ function localEnabledKey(companyId: number) { return `zivifactura.education.enab
 function loadLocalForms(companyId: number): EducationForm[] {
   try { return JSON.parse(localStorage.getItem(localFormsKey(companyId)) || '[]') as EducationForm[] } catch { return [] }
 }
+
 function saveLocalForms(companyId: number, forms: EducationForm[]) {
   localStorage.setItem(localFormsKey(companyId), JSON.stringify(forms))
 }
@@ -149,8 +159,20 @@ function publicPayload(form: EducationForm, company: Company, ownerUid: string) 
 async function copyText(text: string) {
   try { await navigator.clipboard.writeText(text) }
   catch {
-    const area = document.createElement('textarea'); area.value = text; document.body.appendChild(area); area.select(); document.execCommand('copy'); area.remove()
+    const area = document.createElement('textarea')
+    area.value = text
+    document.body.appendChild(area)
+    area.select()
+    document.execCommand('copy')
+    area.remove()
   }
+}
+
+function statusLabel(status: SubmissionStatus) {
+  if (status === 'approved') return 'Aprobada'
+  if (status === 'review') return 'En revisión'
+  if (status === 'rejected') return 'Rechazada'
+  return 'Recibida'
 }
 
 export default function EducationModule() {
@@ -165,9 +187,10 @@ export default function EducationModule() {
   const [message, setMessage] = useState('')
   const [rulesNeeded, setRulesNeeded] = useState(false)
 
-  const activeForm = forms.find(form => form.key === activeKey) || forms[0] || null
   const activeCompanyId = company?.id || getActiveCompanyId()
+  const activeForm = forms.find(form => form.key === activeKey) || forms[0] || null
   const activeSubmissions = useMemo(() => activeForm?.publicId ? submissions.filter(item => item.formId === activeForm.publicId) : [], [submissions, activeForm])
+  const publicUrl = activeForm?.publicId ? `${window.location.origin}/inscripcion.html?id=${encodeURIComponent(activeForm.publicId)}` : ''
 
   useEffect(() => {
     const show = () => { setOpen(true); setMessage(''); setRulesNeeded(false) }
@@ -184,6 +207,7 @@ export default function EducationModule() {
     const companyId = getActiveCompanyId()
     const current = await db.company.get(companyId) || await db.company.get(1) || null
     setCompany(current || null)
+
     const local = loadLocalForms(companyId)
     setForms(local)
     if (local[0]) setActiveKey(local[0].key)
@@ -209,30 +233,48 @@ export default function EducationModule() {
     setEnabled(isEnabled)
   }
 
-  async function persist(nextForms: EducationForm[]) {
+  async function persistLocalFirst(nextForms: EducationForm[], options: { sync?: boolean } = {}) {
     setForms(nextForms)
     saveLocalForms(activeCompanyId, nextForms)
+    if (!options.sync) return
     const user = firebaseAuth?.currentUser
     if (firestore && user) {
       await Promise.all(nextForms.map(form => setDoc(doc(firestore, 'users', user.uid, 'forms', form.key), form, { merge: true })))
     }
   }
 
+  function syncFormsInBackground(nextForms: EducationForm[]) {
+    const user = firebaseAuth?.currentUser
+    if (!firestore || !user) return
+    Promise.all(nextForms.map(form => setDoc(doc(firestore, 'users', user.uid, 'forms', form.key), form, { merge: true })))
+      .catch(error => console.warn('[ZiviFactura] Education background sync:', error))
+  }
+
   async function activate() {
     if (!company) return
     setBusy(true)
-    try {
-      localStorage.setItem(localEnabledKey(company.id), '1')
-      const user = firebaseAuth?.currentUser
-      if (firestore && user) await setDoc(doc(firestore, 'users', user.uid, 'modules', `education-${company.id}`), { enabled: true, companyId: company.id, updatedAt: serverTimestamp() }, { merge: true })
-      setEnabled(true)
-      if (!forms.length) {
-        const template = enrollmentTemplate(company.id)
-        await persist([template])
-        setActiveKey(template.key)
-      }
-      setMessage('Módulo educativo activado. La planilla base ya está lista para personalizar.')
-    } finally { setBusy(false) }
+    setMessage('')
+    setRulesNeeded(false)
+
+    const companyId = company.id || getActiveCompanyId()
+    const local = loadLocalForms(companyId)
+    const nextForms = local.length ? local : [enrollmentTemplate(companyId)]
+
+    localStorage.setItem(localEnabledKey(companyId), '1')
+    saveLocalForms(companyId, nextForms)
+    setForms(nextForms)
+    setActiveKey(nextForms[0]?.key || '')
+    setEnabled(true)
+    setTab('forms')
+    setMessage('Módulo educativo activado en este negocio. Ya puedes editar la planilla base; la publicación del enlace se hace con el botón Publicar.')
+    setBusy(false)
+
+    const user = firebaseAuth?.currentUser
+    if (firestore && user) {
+      setDoc(doc(firestore, 'users', user.uid, 'modules', `education-${companyId}`), { enabled: true, companyId, updatedAt: serverTimestamp() }, { merge: true })
+        .then(() => syncFormsInBackground(nextForms))
+        .catch(error => console.warn('[ZiviFactura] Education module cloud activation:', error))
+    }
   }
 
   function updateActive(patch: Partial<EducationForm>) {
@@ -270,13 +312,18 @@ export default function EducationModule() {
 
   async function saveForm() {
     if (!activeForm) return
-    setBusy(true); setMessage(''); setRulesNeeded(false)
+    setBusy(true)
+    setMessage('')
+    setRulesNeeded(false)
     try {
-      await persist(forms.map(form => form.key === activeForm.key ? { ...form, updatedAt: now() } : form))
+      const next = forms.map(form => form.key === activeForm.key ? { ...form, updatedAt: now() } : form)
+      await persistLocalFirst(next, { sync: Boolean(firebaseAuth?.currentUser && firestore) })
       setMessage('Planilla guardada.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo guardar la planilla.')
-    } finally { setBusy(false) }
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function publishForm() {
@@ -286,20 +333,24 @@ export default function EducationModule() {
       setMessage('Para publicar y recibir inscripciones desde otros teléfonos debes iniciar sesión con tu cuenta de ZiviFactura.')
       return
     }
-    setBusy(true); setMessage(''); setRulesNeeded(false)
+    setBusy(true)
+    setMessage('')
+    setRulesNeeded(false)
     try {
       const publicId = activeForm.publicId || makeId()
       const published: EducationForm = { ...activeForm, publicId, active: true, updatedAt: now() }
       await setDoc(doc(firestore, 'publicForms', publicId), publicPayload(published, company, user.uid), { merge: true })
       const next = forms.map(form => form.key === published.key ? published : form)
-      await persist(next)
+      await persistLocalFirst(next, { sync: true })
       setActiveKey(published.key)
       setMessage('Planilla publicada. Ya puedes compartir el enlace con padres y representantes.')
     } catch (error) {
       const code = (error as { code?: string })?.code || ''
       if (code.includes('permission-denied')) setRulesNeeded(true)
       setMessage(code.includes('permission-denied') ? 'Firebase todavía no permite publicar formularios. Copia las reglas indicadas abajo y publícalas en Firestore.' : (error instanceof Error ? error.message : 'No se pudo publicar.'))
-    } finally { setBusy(false) }
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function unpublishForm() {
@@ -310,9 +361,11 @@ export default function EducationModule() {
     try {
       await updateDoc(doc(firestore, 'publicForms', activeForm.publicId), { active: false, updatedAt: serverTimestamp() })
       const next = forms.map(form => form.key === activeForm.key ? { ...form, active: false, updatedAt: now() } : form)
-      await persist(next)
+      await persistLocalFirst(next, { sync: true })
       setMessage('Planilla pausada. El enlace deja de aceptar nuevas respuestas.')
-    } finally { setBusy(false) }
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function createForm() {
@@ -323,11 +376,14 @@ export default function EducationModule() {
       companyId: company.id,
       title: 'Nueva planilla',
       description: 'Describe brevemente para qué usarás este formulario.',
-      kind: 'custom', active: false, createdAt, updatedAt: createdAt,
+      kind: 'custom',
+      active: false,
+      createdAt,
+      updatedAt: createdAt,
       fields: [f('section_1', 'Información', 'section'), f(`field_${Date.now()}`, 'Primera pregunta', 'text', true)],
     }
     const next = [form, ...forms]
-    await persist(next)
+    await persistLocalFirst(next, { sync: Boolean(firebaseAuth?.currentUser && firestore) })
     setActiveKey(form.key)
     setTab('forms')
   }
@@ -340,13 +396,20 @@ export default function EducationModule() {
       if (activeForm.publicId) await deleteDoc(doc(firestore, 'publicForms', activeForm.publicId)).catch(() => undefined)
     }
     const next = forms.filter(form => form.key !== activeForm.key)
-    setForms(next); saveLocalForms(activeCompanyId, next); setActiveKey(next[0]?.key || '')
+    setForms(next)
+    saveLocalForms(activeCompanyId, next)
+    setActiveKey(next[0]?.key || '')
   }
 
   async function loadResponses() {
     const user = firebaseAuth?.currentUser
-    if (!firestore || !user) { setMessage('Inicia sesión para consultar respuestas recibidas.'); return }
-    setBusy(true); setMessage(''); setRulesNeeded(false)
+    if (!firestore || !user) {
+      setMessage('Inicia sesión para consultar respuestas recibidas.')
+      return
+    }
+    setBusy(true)
+    setMessage('')
+    setRulesNeeded(false)
     try {
       const published = forms.filter(form => form.publicId)
       const batches = await Promise.all(published.map(async form => {
@@ -360,7 +423,9 @@ export default function EducationModule() {
       const code = (error as { code?: string })?.code || ''
       if (code.includes('permission-denied')) setRulesNeeded(true)
       setMessage(code.includes('permission-denied') ? 'Faltan permisos de Firestore para leer las inscripciones. Usa las reglas indicadas abajo.' : 'No se pudieron cargar las respuestas.')
-    } finally { setBusy(false) }
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function setSubmissionStatus(submission: EducationSubmission, status: SubmissionStatus) {
@@ -382,12 +447,14 @@ export default function EducationModule() {
     const existing = clients.find(client => (client.companyId || 1) === activeCompanyId && ((email && normalized(client.email) === normalized(email)) || (phone && client.phone.replace(/\D/g, '') === phone.replace(/\D/g, '')) || normalized(client.name) === normalized(payer)))
     let client: Client | undefined = existing
     if (!client) {
-      const created: Client = { companyId: activeCompanyId, name: payer, taxId: '', phone, email, address, createdAt: now() }
+      const created: Client = { companyId: activeCompanyId, name: payer, taxId: '', phone, email, address, createdAt: now(), updatedAt: now() }
       const id = Number(await db.clients.add(created))
       client = { ...created, id }
     }
     await setSubmissionStatus(submission, 'approved')
-    setMessage(`Inscripción aprobada. ${client.name} quedó disponible como cliente para facturación y cobros.`)
+    const confirmText = `Hola ${payer}. Tu inscripción fue aprobada por ${company?.name || 'el centro educativo'}. Te contactaremos para continuar con inscripción, mensualidad y facturación.`
+    await copyText(confirmText)
+    setMessage(`Inscripción aprobada. ${client.name} quedó disponible como cliente para facturación. También copié un mensaje de confirmación para enviarlo por WhatsApp o correo.`)
   }
 
   async function shareForm() {
@@ -403,8 +470,6 @@ export default function EducationModule() {
 
   if (!open) return null
 
-  const publicUrl = activeForm?.publicId ? `${window.location.origin}/inscripcion.html?id=${encodeURIComponent(activeForm.publicId)}` : ''
-
   return <div className="educationOverlay" role="dialog" aria-modal="true" aria-label="Módulo educativo">
     <div className="educationShell">
       <header className="educationTop">
@@ -416,14 +481,20 @@ export default function EducationModule() {
         <div className="educationActivationIcon"><BookOpen size={34}/></div>
         <span className="educationEyebrow">ACTIVACIÓN OPCIONAL</span>
         <h1>Convierte la inscripción en un flujo administrativo.</h1>
-        <p>Este módulo se activa solo para el negocio que lo necesita. Permite crear planillas, compartirlas con padres o representantes, revisar respuestas y convertir una inscripción aprobada en cliente para facturación.</p>
+        <p>Este módulo se activa por negocio. Permite crear planillas, compartir enlaces con padres o representantes, revisar respuestas y convertir una inscripción aprobada en cliente para facturación, inscripción, mensualidades y mora.</p>
         <div className="educationActivationGrid">
-          <article><ClipboardList/><strong>Planillas propias</strong><span>Basadas en la planilla real que usas hoy, pero editables dentro de ZiviFactura.</span></article>
+          <article><ClipboardList/><strong>Planillas propias</strong><span>Basadas en la planilla real del centro, editables dentro de ZiviFactura.</span></article>
           <article><Send/><strong>Enlace público</strong><span>El representante llena la inscripción desde cualquier teléfono, sin tener cuenta.</span></article>
-          <article><UserCheck/><strong>Aprobación</strong><span>Revisa la información y crea el cliente de cobro sin volver a transcribir datos.</span></article>
+          <article><UserCheck/><strong>Aprobación</strong><span>Revisa la información, aprueba y crea el cliente de cobro sin transcribir datos.</span></article>
         </div>
-        <button className="educationPrimary" disabled={busy} onClick={() => void activate()}><GraduationCap size={18}/>{busy ? 'Activando…' : `Activar para ${company?.name || 'este negocio'}`}</button>
+        <button className="educationPrimary" disabled={busy || !company} onClick={() => void activate()}><GraduationCap size={18}/>{busy ? 'Activando…' : `Activar para ${company?.name || 'este negocio'}`}</button>
       </section> : <>
+        <section className="educationModuleSummary">
+          <article><ClipboardList/><span>Planillas</span><strong>{forms.length}</strong></article>
+          <article><Send/><span>Publicadas</span><strong>{forms.filter(form => form.active).length}</strong></article>
+          <article><Users/><span>Respuestas cargadas</span><strong>{activeSubmissions.length || submissions.length}</strong></article>
+        </section>
+
         <nav className="educationTabs">
           <button className={tab === 'forms' ? 'active' : ''} onClick={() => setTab('forms')}><ClipboardList size={17}/>Planillas</button>
           <button className={tab === 'responses' ? 'active' : ''} onClick={() => { setTab('responses'); void loadResponses() }}><Users size={17}/>Respuestas</button>
@@ -442,7 +513,7 @@ export default function EducationModule() {
 
           <main className="educationEditor">
             {activeForm ? <>
-              <div className="educationEditorHead"><div><span className="educationEyebrow">EDITOR DE PLANILLA</span><h2>{activeForm.title}</h2><p>{activeForm.fields.filter(field => field.type !== 'section').length} preguntas · {activeForm.fields.filter(field => field.required).length} obligatorias</p></div><div><button className="educationGhost" disabled={busy} onClick={() => void saveForm()}><Save size={16}/>Guardar</button>{activeForm.active ? <button className="educationWarn" onClick={() => void unpublishForm()}>Pausar</button> : <button className="educationPrimary small" disabled={busy} onClick={() => void publishForm()}><Send size={16}/>Publicar</button>}</div></div>
+              <div className="educationEditorHead"><div><span className="educationEyebrow">EDITOR DE PLANILLA</span><h2>{activeForm.title}</h2><p>{activeForm.fields.filter(field => field.type !== 'section').length} preguntas · {activeForm.fields.filter(field => field.required).length} obligatorias</p></div><div><button className="educationGhost" disabled={busy} onClick={() => void saveForm()}><Save size={16}/>Guardar</button>{activeForm.active ? <button className="educationWarn" disabled={busy} onClick={() => void unpublishForm()}>Pausar</button> : <button className="educationPrimary small" disabled={busy} onClick={() => void publishForm()}><Send size={16}/>Publicar</button>}</div></div>
 
               <div className="educationFormMeta">
                 <label><span>Título</span><input value={activeForm.title} onChange={event => updateActive({ title: event.target.value })}/></label>
@@ -450,6 +521,11 @@ export default function EducationModule() {
               </div>
 
               {publicUrl && <div className="educationShare"><div><span>ENLACE DE INSCRIPCIÓN</span><strong>{publicUrl}</strong></div><button onClick={() => void copyText(publicUrl)} title="Copiar enlace"><Copy size={17}/></button><button onClick={() => void shareForm()} title="Compartir"><Send size={17}/></button><a href={publicUrl} target="_blank" rel="noreferrer" title="Abrir"><ExternalLink size={17}/></a></div>}
+
+              <div className="educationFlowNote">
+                <strong>Flujo de prueba</strong>
+                <span>Publicar planilla → enviar enlace al representante → recibir respuesta → revisar → aprobar → crear cliente para inscripción, mensualidad o mora.</span>
+              </div>
 
               <div className="educationFields">
                 {activeForm.fields.map((field, index) => field.type === 'section' ? <article className="educationSectionField" key={field.id}><div><BookOpen size={17}/><input value={field.label} onChange={event => updateField(field.id, { label: event.target.value })}/></div><div><button disabled={index === 0} onClick={() => moveField(field.id, -1)}><ArrowUp size={15}/></button><button disabled={index === activeForm.fields.length - 1} onClick={() => moveField(field.id, 1)}><ArrowDown size={15}/></button><button onClick={() => removeField(field.id)}><Trash2 size={15}/></button></div></article> : <article className="educationQuestion" key={field.id}>
@@ -460,7 +536,7 @@ export default function EducationModule() {
               </div>
 
               <div className="educationEditorFooter"><button className="educationDanger" onClick={() => void deleteForm()}><Trash2 size={16}/>Eliminar planilla</button><button className="educationPrimary" disabled={busy} onClick={() => void saveForm()}><Save size={16}/>Guardar cambios</button></div>
-            </> : <div className="educationEmpty"><ClipboardList size={30}/><h3>Crea tu primera planilla</h3><p>La plantilla de inscripción educativa replica el flujo principal de la planilla que usas actualmente, eliminando preguntas duplicadas y organizándola por secciones.</p><button className="educationPrimary" onClick={() => void activate()}><Plus size={17}/>Crear plantilla base</button></div>}
+            </> : <div className="educationEmpty"><ClipboardList size={30}/><h3>Crea tu primera planilla</h3><p>La plantilla de inscripción educativa replica el flujo principal del centro y organiza la información por secciones.</p><button className="educationPrimary" onClick={() => void activate()}><Plus size={17}/>Crear plantilla base</button></div>}
           </main>
         </div>}
 
@@ -468,7 +544,7 @@ export default function EducationModule() {
           <div className="educationResponseHead"><div><span className="educationEyebrow">INSCRIPCIONES RECIBIDAS</span><h2>Revisión y aprobación</h2><p>Las respuestas quedan separadas de la facturación hasta que decidas aprobarlas.</p></div><button className="educationGhost" disabled={busy} onClick={() => void loadResponses()}>Actualizar</button></div>
           {!submissions.length ? <div className="educationEmpty"><Users size={30}/><h3>Aún no hay inscripciones</h3><p>Publica y comparte una planilla. Cuando un representante la envíe, aparecerá aquí para revisión.</p></div> : <div className="educationResponseList">{submissions.map(submission => {
             const form = forms.find(item => item.publicId === submission.formId)
-            return <details key={`${submission.formId}-${submission.id}`} className="educationResponseCard"><summary><span><UserCheck size={18}/></span><div><strong>{submission.respondentName || submission.answers?.studentName || 'Nueva inscripción'}</strong><small>{form?.title || 'Planilla'} · {submission.status === 'approved' ? 'Aprobada' : submission.status === 'review' ? 'En revisión' : submission.status === 'rejected' ? 'Rechazada' : 'Recibida'}</small></div><b>{submission.respondentEmail || submission.answers?.email || ''}</b></summary><div className="educationAnswerGrid">{form?.fields.filter(field => field.type !== 'section').map(field => <article key={field.id}><span>{field.label}</span><strong>{submission.answers?.[field.key] || '—'}</strong></article>)}</div><div className="educationResponseActions"><button onClick={() => void setSubmissionStatus(submission, 'review')}>Marcar en revisión</button><button className="educationDanger" onClick={() => void setSubmissionStatus(submission, 'rejected')}>Rechazar</button><button className="educationPrimary small" onClick={() => void approveAndCreateClient(submission)}><CheckCircle2 size={15}/>Aprobar y crear cliente</button></div></details>
+            return <details key={`${submission.formId}-${submission.id}`} className="educationResponseCard"><summary><span><UserCheck size={18}/></span><div><strong>{submission.respondentName || submission.answers?.studentName || 'Nueva inscripción'}</strong><small>{form?.title || 'Planilla'} · {statusLabel(submission.status)}</small></div><b>{submission.respondentEmail || submission.answers?.email || ''}</b></summary><div className="educationAnswerGrid">{form?.fields.filter(field => field.type !== 'section').map(field => <article key={field.id}><span>{field.label}</span><strong>{submission.answers?.[field.key] || '—'}</strong></article>)}</div><div className="educationResponseActions"><button onClick={() => void setSubmissionStatus(submission, 'review')}>Marcar en revisión</button><button className="educationDanger" onClick={() => void setSubmissionStatus(submission, 'rejected')}>Rechazar</button><button className="educationPrimary small" onClick={() => void approveAndCreateClient(submission)}><CheckCircle2 size={15}/>Aprobar y crear cliente</button></div></details>
           })}</div>}
         </section>}
       </>}
