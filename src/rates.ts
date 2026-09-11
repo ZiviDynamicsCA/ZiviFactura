@@ -7,12 +7,20 @@ export interface LiveRates extends RateSnapshot {
   attribution?: string
 }
 
+export function bcvAverageRate(rates?: RateSnapshot | null) {
+  const usd = Number(rates?.usdBcv) || 0
+  const eur = Number(rates?.eurBcv) || 0
+  if (!usd || !eur) return 0
+  return (usd + eur) / 2
+}
+
 export const rateSourceLabels: Record<RateSource, string> = {
   none: 'Sin tasa de conversión',
   bcv_usd: 'BCV dólar',
   bcv_eur: 'BCV euro',
-  binance: 'Binance P2P / USDT',
-  usdt_average: 'Promedio USDT P2P',
+  bcv_average: 'Promedio BCV USD/EUR',
+  binance: 'USDT Binance',
+  usdt_average: 'Promedio USDT',
   custom: 'Tasa personalizada',
 }
 
@@ -21,6 +29,7 @@ export function getRateValue(source: RateSource, rates?: RateSnapshot | null, cu
   if (!rates) return 0
   if (source === 'bcv_usd') return Number(rates.usdBcv) || 0
   if (source === 'bcv_eur') return Number(rates.eurBcv) || 0
+  if (source === 'bcv_average') return bcvAverageRate(rates)
   if (source === 'binance') return Number(rates.binanceBuy) || 0
   if (source === 'usdt_average') return Number(rates.usdtAverage) || 0
   return 0
@@ -117,10 +126,12 @@ export function formatRate(value?: number, digits = 2) {
 
 export function pivotConversions(ves: number, rates?: RateSnapshot | null) {
   const safe = Math.max(0, Number(ves) || 0)
+  const bcvAverage = bcvAverageRate(rates)
   return {
     VES: safe,
     USD: rates?.usdBcv ? safe / rates.usdBcv : undefined,
     EUR: rates?.eurBcv ? safe / rates.eurBcv : undefined,
+    BCV_AVERAGE: bcvAverage ? safe / bcvAverage : undefined,
     USDT_BINANCE: rates?.binanceBuy ? safe / rates.binanceBuy : undefined,
     USDT_AVERAGE: rates?.usdtAverage ? safe / rates.usdtAverage : undefined,
   }
