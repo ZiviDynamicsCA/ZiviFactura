@@ -1,4 +1,4 @@
-const CACHE = 'zivifactura-shell-v45'
+const CACHE = 'zivifactura-shell-v46'
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest?v=43',
