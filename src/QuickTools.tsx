@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BarChart3, Calculator, Copy, DollarSign, FilePlus2, MoreHorizontal, ReceiptText, RefreshCw, Settings, Wallet, WalletCards, X } from 'lucide-react'
 import { fetchLiveRates, getCachedRates, refreshRatesIfDue, type LiveRates } from './rates'
 import './quick-tools.css'
+import './quick-mobile-fixes.css'
 
 type WorkspaceKey = 'billing' | 'receivables' | 'payments' | 'income' | 'stats'
 type CalcCurrency = 'USD' | 'VES' | 'EUR' | 'USDT'
