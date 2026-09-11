@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
-import { repairExactInvoiceDuplicates } from './dataIntegrity'
+import { repairExactInvoiceDuplicates, repairExactPaymentDuplicates } from './dataIntegrity'
 import { db, defaultCompany, invoiceLogicalKeyFor, makeSyncId } from './db'
 import { firestore } from './firebase'
 import type { Client, Company, Invoice, Payment, Product } from './types'
@@ -218,8 +218,9 @@ export async function syncFirebaseNow(uid = activeUid || '') {
   try {
     await ensureLocalSyncIds()
     await Promise.all([pullCompanies(uid), pullInvoices(uid), pullClients(uid), pullProducts(uid), pullPayments(uid)])
-    const repair = await repairExactInvoiceDuplicates()
-    if (repair.hidden > 0) console.info(`[ZiviFactura] ${repair.hidden} duplicado(s) técnico(s) ocultado(s) durante sync.`)
+    const [invoiceRepair, paymentRepair] = await Promise.all([repairExactInvoiceDuplicates(), repairExactPaymentDuplicates()])
+    if (invoiceRepair.hidden > 0) console.info(`[ZiviFactura] ${invoiceRepair.hidden} factura(s) duplicada(s) ocultada(s) durante sync.`)
+    if (paymentRepair.hidden > 0) console.info(`[ZiviFactura] ${paymentRepair.hidden} movimiento(s) de caja duplicado(s) ocultado(s) durante sync.`)
   } finally {
     applyingRemote = false
   }
@@ -228,7 +229,7 @@ export async function syncFirebaseNow(uid = activeUid || '') {
     await Promise.all([pushCompanies(uid), pushInvoices(uid), pushClients(uid), pushProducts(uid), pushPayments(uid)])
     await setDoc(doc(firestore, 'users', uid, 'meta', 'sync'), {
       lastSyncAt: new Date().toISOString(),
-      strategy: 'non-destructive-sync-id-v2-safe-duplicate-archive',
+      strategy: 'non-destructive-sync-id-v3-safe-invoice-payment-duplicate-archive',
     }, { merge: true })
     statusCallback?.('synced', 'Datos sincronizados sin eliminación automática')
     window.dispatchEvent(new CustomEvent('zivifactura:data-synced', { detail: { removedInvoices: 0 } }))
@@ -256,8 +257,9 @@ db.payments.hook('creating', () => scheduleSync())
 db.payments.hook('updating', () => scheduleSync())
 
 // Data-safety policy: deletes are not propagated to Firestore here.
-// Exact duplicate invoice records are archived by moving their companyId to a
-// negative internal scope. They remain inside IndexedDB and backups.
+// Exact duplicate invoice/payment records are archived by moving their
+// companyId to a negative internal scope. They remain in IndexedDB, Firestore,
+// and JSON backups, but no longer inflate operational totals.
 
 export function startFirebaseSync(uid: string, callback?: StatusCallback) {
   activeUid = uid
