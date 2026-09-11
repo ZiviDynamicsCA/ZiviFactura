@@ -1,3 +1,5 @@
+import type { BusinessModuleKey, BusinessProfileKey } from './businessProfiles'
+
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'cancelled'
 export type InvoiceType = 'Factura' | 'Proforma' | 'Presupuesto'
 export type RateSource = 'none' | 'bcv_usd' | 'bcv_eur' | 'bcv_average' | 'binance' | 'usdt_average' | 'custom'
@@ -32,6 +34,10 @@ export interface Company {
   nextInvoiceNumber: number
   prefix: string
   logoDataUrl?: string
+  businessProfile?: BusinessProfileKey
+  enabledModules?: BusinessModuleKey[]
+  monthlyLateFeePct?: number
+  billingDay?: number
   mobilePaymentBank?: string
   mobilePaymentPhone?: string
   mobilePaymentId?: string
