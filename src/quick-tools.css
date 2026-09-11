@@ -1,1 +1,792 @@
-body.quick-nav-active{padding-bottom:92px}.quick-nav-active .workspaceNav,.quick-nav-active .top nav,.quick-nav-active .top>.primary{display:none!important}.quick-nav-active .top{position:relative;top:auto;z-index:10;height:auto;min-height:60px;padding:9px 20px;background:rgba(255,255,255,.88);box-shadow:none}.quick-nav-active .top .brand{margin-right:0}.quick-nav-active .page{padding-bottom:54px}.quick-nav-active .toast{bottom:106px}.quickBackdrop{position:fixed;inset:0;z-index:88;border:0;background:rgba(4,12,28,.46);backdrop-filter:blur(3px)}.quickDock{position:fixed;z-index:94;left:50%;bottom:12px;transform:translateX(-50%);width:min(760px,calc(100vw - 18px));min-height:70px;padding:7px 8px calc(7px + env(safe-area-inset-bottom));border:1px solid rgba(196,207,225,.9);border-radius:22px;background:rgba(255,255,255,.94);backdrop-filter:blur(24px);box-shadow:0 18px 50px rgba(14,31,70,.19);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px}.quickDock button{border:0;background:transparent;border-radius:15px;color:#66748a;min-width:0;min-height:54px;padding:5px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-weight:760}.quickDock button svg{width:20px;height:20px}.quickDock button span{font-size:.67rem;white-space:nowrap}.quickDock button.active{background:linear-gradient(145deg,#edf3ff,#eefbff);color:#1753c8}.quickDock button.tool{color:#0e7490}.quickDock button.tool.active{color:#0f6fa8;background:linear-gradient(145deg,#e7f9ff,#edf5ff)}.quickFab{position:fixed;z-index:96;right:max(18px,calc((100vw - 760px)/2 + 18px));bottom:92px;min-height:46px;border:0;border-radius:16px;padding:0 14px;background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;display:flex;align-items:center;gap:7px;font-weight:850;box-shadow:0 14px 30px rgba(37,99,235,.32)}.quickFab span{font-size:.78rem}.quickCalculatorSheet,.quickMoreSheet{position:fixed;z-index:92;left:50%;bottom:94px;transform:translateX(-50%);width:min(920px,calc(100vw - 20px));max-height:min(78vh,720px);overflow:auto;border:1px solid rgba(211,220,233,.96);border-radius:26px;background:#fff;box-shadow:0 28px 80px rgba(5,18,44,.28);padding:12px 18px 20px}.quickSheetHandle{width:44px;height:5px;border-radius:99px;background:#d8e0eb;margin:0 auto 12px}.quickSheetHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}.quickSheetHead>div>span,.quickMoreSheet header>div>span{font-size:.66rem;font-weight:900;letter-spacing:.14em;color:#2563eb}.quickSheetHead h2,.quickMoreSheet h2{margin:3px 0 5px;font-size:1.38rem;letter-spacing:-.025em}.quickSheetHead p{margin:0;font-size:.8rem}.quickSheetHead>button,.quickMoreSheet header>button{width:38px;height:38px;border:0;border-radius:12px;background:#f1f5fb;color:#58677c;display:grid;place-items:center;flex:none}.quickCalcWorkspace{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:16px}.quickCalcMain,.quickRates{border:1px solid #e4eaf3;border-radius:19px;background:#fbfdff;padding:14px;min-width:0}.quickExpression{display:grid;gap:6px}.quickExpression span,.quickCurrencyRow>span{font-size:.72rem;font-weight:780;color:#617087}.quickExpression input{width:100%;height:52px;border:1px solid #dbe3ef;border-radius:13px;background:#fff;padding:0 13px;font-size:1.08rem;font-weight:730;color:#17233b}.quickResult{margin-top:10px;border-radius:15px;background:linear-gradient(135deg,#0d1b35,#173b8f);color:#fff;padding:13px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}.quickResult>span{font-size:.69rem;color:#a9bddc}.quickResult>strong{grid-column:1;font-size:1.45rem;letter-spacing:-.035em;overflow-wrap:anywhere}.quickResult>button{grid-column:2;grid-row:1/3;min-height:38px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:rgba(255,255,255,.08);color:#fff;padding:0 10px;display:flex;align-items:center;gap:6px;font-weight:780}.quickCurrencyRow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0}.quickCurrencyRow>div{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.quickCurrencyRow button{height:30px;border:1px solid #dfe6f1;border-radius:9px;background:#fff;color:#637188;padding:0 9px;font-size:.71rem;font-weight:820}.quickCurrencyRow button.active{background:#eaf1ff;border-color:#bad0f6;color:#1d56c7}.quickKeypad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.quickKeypad button{height:42px;border:1px solid #e0e7f1;border-radius:11px;background:#fff;color:#293851;font-weight:820}.quickKeypad button.operator{background:#edf4ff;color:#1f5ccc;border-color:#d8e5fa}.quickApply{width:100%;min-height:46px;margin-top:10px;border:0;border-radius:12px;background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;font-weight:840;display:flex;align-items:center;justify-content:center;gap:8px}.quickRates{display:grid;align-content:start;gap:11px}.quickRatesHead{display:flex;align-items:center;justify-content:space-between;gap:10px}.quickRatesHead span,.quickEquivalentBlock>span{display:block;font-size:.63rem;font-weight:880;letter-spacing:.12em;color:#73829a}.quickRatesHead strong{display:block;margin-top:2px;color:#1d2d49}.quickRatesHead>button{width:36px;height:36px;border:1px solid #e0e7f0;border-radius:10px;background:#fff;color:#2862c7;display:grid;place-items:center}.quickRateList,.quickEquivalentBlock{display:grid;gap:6px}.quickRateList>button,.quickEquivalentBlock>button{min-height:43px;border:1px solid #e3e9f2;border-radius:11px;background:#fff;padding:7px 9px;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:8px;text-align:left;color:#21314e}.quickRateList>button span,.quickEquivalentBlock>button span{font-size:.71rem;color:#69788f}.quickRateList>button strong,.quickEquivalentBlock>button strong{font-size:.82rem;text-align:right}.quickRateList>p{font-size:.75rem;margin:0}.quickEquivalentBlock{border-top:1px solid #e5ebf3;padding-top:10px}.quickMoreSheet{width:min(620px,calc(100vw - 20px));padding-bottom:18px}.quickMoreSheet header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px}.quickMoreGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.quickMoreGrid>button{min-height:78px;border:1px solid #e1e8f2;border-radius:15px;background:#fbfdff;color:#1e2d49;padding:12px;display:flex;align-items:center;gap:11px;text-align:left}.quickMoreGrid>button>svg{width:38px;height:38px;padding:9px;border-radius:12px;background:#edf4ff;color:#2563eb;flex:none}.quickMoreGrid strong,.quickMoreGrid small{display:block}.quickMoreGrid strong{font-size:.84rem}.quickMoreGrid small{margin-top:3px;color:#748198;font-size:.69rem;line-height:1.35}.priceField{position:relative}.priceField input{padding-right:48px!important}.inlineCalcButton{position:absolute;right:5px;bottom:5px;width:34px;height:34px;border:1px solid #d6e3f5;border-radius:9px;background:linear-gradient(145deg,#edf4ff,#e8fbff);display:grid;place-items:center;font-size:1rem;line-height:1;color:#1753c8;z-index:3}.inlineCalcButton:hover{border-color:#9fc0f5;transform:translateY(-1px)}.businessBar{position:sticky;top:0;z-index:34}.quick-nav-active .accountBar{position:relative;z-index:35}@media(max-width:760px){body.quick-nav-active{padding-bottom:86px}.quick-nav-active .top{min-height:56px;padding:8px 13px}.quick-nav-active .top .brand>span{width:38px;height:38px;border-radius:12px}.quick-nav-active .page{padding-bottom:40px}.quick-nav-active .toast{bottom:98px}.quickDock{bottom:7px;width:calc(100vw - 12px);min-height:66px;border-radius:20px;padding:5px 4px calc(5px + env(safe-area-inset-bottom));gap:1px}.quickDock button{min-height:52px;padding:4px 1px;border-radius:13px}.quickDock button svg{width:19px;height:19px}.quickDock button span{font-size:.59rem;letter-spacing:-.01em}.quickFab{right:14px;bottom:83px;min-height:43px;border-radius:14px;padding:0 12px}.quickFab span{display:none}.quickCalculatorSheet,.quickMoreSheet{bottom:79px;width:calc(100vw - 12px);max-height:calc(100vh - 116px);border-radius:23px 23px 18px 18px;padding:10px 12px 16px}.quickCalcWorkspace{grid-template-columns:1fr}.quickRates{padding:12px}.quickSheetHead h2,.quickMoreSheet h2{font-size:1.22rem}.quickSheetHead p{font-size:.75rem}.quickExpression input{height:50px}.quickResult>strong{font-size:1.28rem}.quickCurrencyRow{align-items:flex-start;flex-direction:column}.quickCurrencyRow>div{justify-content:flex-start}.quickMoreGrid{grid-template-columns:1fr}.quickMoreGrid>button{min-height:68px}.inlineCalcButton{right:5px;bottom:5px}.priceField input{padding-right:46px!important}}@media(max-width:390px){.quickDock button span{font-size:.55rem}.quickDock button svg{width:18px;height:18px}.quickFab{right:10px}.quickCalculatorSheet{max-height:calc(100vh - 104px)}.quickCalcMain{padding:11px}.quickKeypad button{height:40px}.quickMoreSheet{padding-left:10px;padding-right:10px}}
+body.quick-nav-active {
+  padding-bottom: 98px;
+}
+
+.quick-nav-active .workspaceNav,
+.quick-nav-active .top nav,
+.quick-nav-active .top > .primary {
+  display: none !important;
+}
+
+.quick-nav-active .top {
+  position: relative;
+  top: auto;
+  z-index: 10;
+  min-height: 60px;
+  padding: 9px 20px;
+  background: rgba(255, 255, 255, .88);
+  box-shadow: none;
+}
+
+.quick-nav-active .page {
+  padding-bottom: 54px;
+}
+
+.quick-nav-active .toast {
+  z-index: 140;
+  bottom: calc(112px + env(safe-area-inset-bottom));
+}
+
+.quickBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 118;
+  border: 0;
+  background: rgba(4, 12, 28, .46);
+  backdrop-filter: blur(3px);
+}
+
+.quickDock {
+  position: fixed;
+  z-index: 120;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(820px, calc(100vw - 18px));
+  min-height: 78px;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  border: 1px solid rgba(196, 207, 225, .9);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, .95);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 18px 50px rgba(14, 31, 70, .22);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  align-items: stretch;
+}
+
+.quickDock button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: 16px;
+  color: #66748a;
+  min-width: 0;
+  min-height: 58px;
+  padding: 5px 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.quickDock button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.quickDock button span {
+  font-size: .66rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.quickDock button.active {
+  background: linear-gradient(145deg, #edf3ff, #eefbff);
+  color: #1753c8;
+}
+
+.quickDock button.tool {
+  color: #0e7490;
+}
+
+.quickDock button.tool.active {
+  color: #0f6fa8;
+  background: linear-gradient(145deg, #e7f9ff, #edf5ff);
+}
+
+.quickDock .quickDockCreate {
+  min-height: 64px;
+  margin-top: -14px;
+  color: #fff;
+  background: linear-gradient(135deg, #10d7ff, #0b72ff);
+  box-shadow: 0 15px 35px rgba(14, 165, 233, .36);
+  border: 1px solid rgba(255, 255, 255, .28);
+}
+
+.quickDock .quickDockCreate svg {
+  width: 25px;
+  height: 25px;
+}
+
+.quickDock .quickDockCreate span {
+  color: #fff;
+  font-weight: 900;
+}
+
+.quickCalculatorSheet,
+.quickMoreSheet {
+  position: fixed;
+  z-index: 119;
+  left: 50%;
+  bottom: calc(104px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(920px, calc(100vw - 20px));
+  max-height: min(68vh, 620px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(211, 220, 233, .96);
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(5, 18, 44, .28);
+  padding: 12px 18px 20px;
+}
+
+.quickSheetHandle {
+  width: 44px;
+  height: 5px;
+  border-radius: 99px;
+  background: #d8e0eb;
+  margin: 0 auto 12px;
+}
+
+.quickSheetHead,
+.quickMoreSheet header {
+  position: sticky;
+  top: -12px;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-top: 4px;
+  padding-bottom: 10px;
+  background: #fff;
+}
+
+.quickSheetHead > div > span,
+.quickMoreSheet header > div > span {
+  font-size: .66rem;
+  font-weight: 900;
+  letter-spacing: .14em;
+  color: #2563eb;
+}
+
+.quickSheetHead h2,
+.quickMoreSheet h2 {
+  margin: 3px 0 5px;
+  font-size: 1.34rem;
+  letter-spacing: -.025em;
+  color: #102039;
+}
+
+.quickSheetHead p {
+  margin: 0;
+  font-size: .8rem;
+  color: #66748a;
+}
+
+.quickSheetHead > button,
+.quickMoreSheet header > button {
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 14px;
+  background: #f1f5fb;
+  color: #58677c;
+  display: grid;
+  place-items: center;
+  flex: none;
+  cursor: pointer;
+}
+
+.quickCalcWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+  gap: 16px;
+}
+
+.quickCalcMain,
+.quickRates {
+  border: 1px solid #e4eaf3;
+  border-radius: 19px;
+  background: #fbfdff;
+  padding: 14px;
+  min-width: 0;
+}
+
+.quickExpression {
+  display: grid;
+  gap: 6px;
+}
+
+.quickExpression span,
+.quickCurrencyRow > span {
+  font-size: .72rem;
+  font-weight: 780;
+  color: #617087;
+}
+
+.quickExpression input {
+  width: 100%;
+  height: 52px;
+  border: 1px solid #dbe3ef;
+  border-radius: 13px;
+  background: #fff;
+  padding: 0 13px;
+  font-size: 1.08rem;
+  font-weight: 730;
+  color: #17233b;
+}
+
+.quickResult {
+  margin-top: 10px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #0d1b35, #173b8f);
+  color: #fff;
+  padding: 13px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.quickResult > span {
+  font-size: .69rem;
+  color: #a9bddc;
+}
+
+.quickResult > strong {
+  grid-column: 1;
+  font-size: 1.42rem;
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+
+.quickResult > button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+.quickResult > button:disabled,
+.quickApply:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.quickResultMeta {
+  grid-column: 1 / -1;
+  font-size: .72rem;
+  color: #cfe3ff;
+}
+
+.quickSourceResult {
+  margin-top: 8px;
+  border: 1px dashed #c9d7eb;
+  border-radius: 13px;
+  background: #fff;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.quickSourceResult span {
+  font-size: .71rem;
+  color: #6c7a90;
+}
+
+.quickSourceResult strong {
+  color: #12213a;
+  font-size: .9rem;
+  white-space: nowrap;
+}
+
+.quickCurrencyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.quickCurrencyRow > div {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.quickCurrencyRow button {
+  height: 30px;
+  border: 1px solid #dfe6f1;
+  border-radius: 9px;
+  background: #fff;
+  color: #637188;
+  padding: 0 9px;
+  font-size: .71rem;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.quickCurrencyRow button.active {
+  background: #eaf1ff;
+  border-color: #bad0f6;
+  color: #1d56c7;
+}
+
+.quickKeypad {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.quickKeypad button {
+  height: 42px;
+  border: 1px solid #e0e7f1;
+  border-radius: 11px;
+  background: #fff;
+  color: #293851;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.quickKeypad button.operator {
+  background: #edf4ff;
+  color: #1f5ccc;
+  border-color: #d8e5fa;
+}
+
+.quickApply {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  color: #fff;
+  font-weight: 840;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.quickRates {
+  display: grid;
+  align-content: start;
+  gap: 11px;
+}
+
+.quickRatesHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.quickRatesHead span,
+.quickEquivalentBlock > span {
+  display: block;
+  font-size: .63rem;
+  font-weight: 880;
+  letter-spacing: .12em;
+  color: #73829a;
+}
+
+.quickRatesHead strong {
+  display: block;
+  margin-top: 2px;
+  color: #1d2d49;
+}
+
+.quickRatesHead > button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #e0e7f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #2862c7;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.quickRateList,
+.quickEquivalentBlock {
+  display: grid;
+  gap: 6px;
+}
+
+.quickRateList > button,
+.quickEquivalentBlock > button {
+  min-height: 43px;
+  border: 1px solid #e3e9f2;
+  border-radius: 11px;
+  background: #fff;
+  padding: 7px 9px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  color: #21314e;
+  cursor: pointer;
+}
+
+.quickRateList > button span,
+.quickEquivalentBlock > button span {
+  font-size: .71rem;
+  color: #69788f;
+}
+
+.quickRateList > button strong,
+.quickEquivalentBlock > button strong {
+  font-size: .82rem;
+  text-align: right;
+}
+
+.quickRateList > p {
+  font-size: .75rem;
+  margin: 0;
+  color: #66748a;
+}
+
+.quickEquivalentBlock {
+  border-top: 1px solid #e5ebf3;
+  padding-top: 10px;
+}
+
+.quickMoreSheet {
+  width: min(620px, calc(100vw - 20px));
+  padding-bottom: 18px;
+}
+
+.quickMoreGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.quickMoreGrid > button {
+  min-height: 78px;
+  border: 1px solid #e1e8f2;
+  border-radius: 15px;
+  background: #fbfdff;
+  color: #1e2d49;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quickMoreGrid > button > svg {
+  width: 38px;
+  height: 38px;
+  padding: 9px;
+  border-radius: 12px;
+  background: #edf4ff;
+  color: #2563eb;
+  flex: none;
+}
+
+.quickMoreGrid strong,
+.quickMoreGrid small {
+  display: block;
+}
+
+.quickMoreGrid strong {
+  font-size: .84rem;
+}
+
+.quickMoreGrid small {
+  margin-top: 3px;
+  color: #748198;
+  font-size: .69rem;
+  line-height: 1.35;
+}
+
+.priceField {
+  position: relative;
+}
+
+.priceField input {
+  padding-right: 48px !important;
+}
+
+.inlineCalcButton {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #d6e3f5;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #edf4ff, #e8fbff);
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  line-height: 1;
+  color: #1753c8;
+  z-index: 3;
+  cursor: pointer;
+}
+
+.inlineCalcButton:hover {
+  border-color: #9fc0f5;
+  transform: translateY(-1px);
+}
+
+.businessBar {
+  position: sticky;
+  top: 0;
+  z-index: 34;
+}
+
+.quick-nav-active .accountBar {
+  position: relative;
+  z-index: 35;
+}
+
+.spin {
+  animation: quickSpin .8s linear infinite;
+}
+
+@keyframes quickSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 760px) {
+  body.quick-nav-active {
+    padding-bottom: 88px;
+  }
+
+  .quick-nav-active .top {
+    min-height: 56px;
+    padding: 8px 13px;
+  }
+
+  .quick-nav-active .page {
+    padding-bottom: 40px;
+  }
+
+  .quick-nav-active .toast {
+    bottom: calc(100px + env(safe-area-inset-bottom));
+  }
+
+  .quickDock {
+    bottom: 7px;
+    width: calc(100vw - 12px);
+    min-height: 72px;
+    border-radius: 20px;
+    padding: 5px 5px calc(5px + env(safe-area-inset-bottom));
+    gap: 1px;
+  }
+
+  .quickDock button {
+    min-height: 54px;
+    padding: 4px 1px;
+    border-radius: 13px;
+  }
+
+  .quickDock button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .quickDock button span {
+    font-size: .56rem;
+    letter-spacing: -.02em;
+  }
+
+  .quickDock .quickDockCreate {
+    min-height: 62px;
+    margin-top: -12px;
+    border-radius: 18px;
+  }
+
+  .quickDock .quickDockCreate svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .quickCalculatorSheet,
+  .quickMoreSheet {
+    left: 8px;
+    right: 8px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    transform: none;
+    width: auto;
+    max-height: min(60vh, 540px);
+    border-radius: 19px;
+    padding: 8px 10px 12px;
+  }
+
+  .quickSheetHandle {
+    width: 38px;
+    height: 4px;
+    margin-bottom: 7px;
+  }
+
+  .quickSheetHead,
+  .quickMoreSheet header {
+    top: -8px;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 7px;
+  }
+
+  .quickSheetHead h2,
+  .quickMoreSheet h2 {
+    font-size: 1rem;
+    margin-bottom: 0;
+  }
+
+  .quickSheetHead p {
+    display: none;
+  }
+
+  .quickCalcWorkspace {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .quickCalcMain,
+  .quickRates {
+    padding: 10px;
+    border-radius: 15px;
+  }
+
+  .quickExpression input {
+    height: 42px;
+    font-size: .95rem;
+  }
+
+  .quickResult {
+    margin-top: 7px;
+    padding: 9px;
+    border-radius: 12px;
+  }
+
+  .quickResult > strong {
+    font-size: 1.05rem;
+  }
+
+  .quickResult > button {
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: .72rem;
+  }
+
+  .quickSourceResult {
+    padding: 7px 9px;
+  }
+
+  .quickCurrencyRow {
+    margin: 7px 0;
+    gap: 6px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .quickCurrencyRow > div {
+    justify-content: flex-start;
+  }
+
+  .quickCurrencyRow button {
+    height: 28px;
+    padding: 0 8px;
+  }
+
+  .quickKeypad {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .quickKeypad button {
+    height: 34px;
+    border-radius: 9px;
+    font-size: .86rem;
+  }
+
+  .quickApply {
+    min-height: 40px;
+    margin-top: 8px;
+    font-size: .82rem;
+  }
+
+  .quickRatesHead {
+    margin-bottom: 2px;
+  }
+
+  .quickRateList {
+    display: none;
+  }
+
+  .quickEquivalentBlock {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .quickEquivalentBlock > button {
+    min-height: 36px;
+    padding: 6px 8px;
+  }
+
+  .quickEquivalentBlock > button span,
+  .quickEquivalentBlock > button strong {
+    font-size: .72rem;
+  }
+
+  .quickMoreGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .quickMoreGrid > button {
+    min-height: 68px;
+  }
+}
+
+@media (max-width: 390px) {
+  .quickDock button span {
+    font-size: .52rem;
+  }
+
+  .quickDock button svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .quickDock .quickDockCreate svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .quickCalculatorSheet,
+  .quickMoreSheet {
+    left: 6px;
+    right: 6px;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    max-height: min(58vh, 510px);
+    padding: 7px 8px 10px;
+  }
+
+  .quickKeypad button {
+    height: 31px;
+    font-size: .8rem;
+  }
+
+  .quickResult > strong {
+    font-size: .98rem;
+  }
+}
