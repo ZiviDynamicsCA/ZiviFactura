@@ -1,4 +1,4 @@
-/* Ajustes móviles finales para calculadora: sin teclado nativo y con scroll interno útil. */
+/* Ajustes móviles finales para calculadora, dock inferior y tasas. */
 .quickExpression input[readonly] {
   caret-color: transparent;
   cursor: default;
@@ -13,10 +13,96 @@
   touch-action: pan-y;
 }
 
+/* Teclado interno en 4 columnas reales: 7-8-9-dividir / 4-5-6-multiplicar / 1-2-3-restar. */
+.quickKeypad {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
 @media (max-width: 760px) {
+  body.quick-nav-active {
+    padding-bottom: 76px !important;
+  }
+
+  body.quick-nav-active.quick-editor-active {
+    padding-bottom: 10px !important;
+  }
+
+  /* Dock móvil: una sola fila. Se oculta Tasas del dock y queda disponible dentro de Más. */
+  .quickDock {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    grid-template-rows: 1fr !important;
+    grid-auto-flow: column !important;
+    grid-auto-rows: 0 !important;
+    left: 6px !important;
+    right: 6px !important;
+    bottom: 7px !important;
+    transform: none !important;
+    width: auto !important;
+    min-height: 66px !important;
+    max-height: 82px !important;
+    padding: 5px 4px calc(5px + env(safe-area-inset-bottom)) !important;
+    gap: 1px !important;
+    overflow: visible !important;
+    align-items: stretch !important;
+  }
+
+  .quickDock > button {
+    grid-row: 1 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-height: 52px !important;
+    flex: none !important;
+    display: flex !important;
+    overflow: hidden !important;
+  }
+
+  .quickDock > button:nth-child(1) { grid-column: 1 !important; }
+  .quickDock > button:nth-child(2) { grid-column: 2 !important; }
+  .quickDock > button:nth-child(3) { grid-column: 3 !important; }
+  .quickDock > button:nth-child(4) { grid-column: 4 !important; }
+  .quickDock > button:nth-child(5) { grid-column: 5 !important; }
+
+  /* El botón 6 es Tasas/Calculadora; en móvil se accede desde Más para evitar dos filas. */
+  .quickDock > button:nth-child(6) {
+    display: none !important;
+  }
+
+  .quickDock > button:nth-child(7) {
+    grid-column: 6 !important;
+  }
+
+  .quickDock button svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .quickDock button span {
+    font-size: .52rem !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+
+  .quickDock .quickDockCreate {
+    min-height: 58px !important;
+    margin-top: -10px !important;
+    border-radius: 15px !important;
+  }
+
   .quickCalculatorSheet,
   .quickMoreSheet {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    transform: none !important;
+    width: auto !important;
     max-height: min(76vh, 560px) !important;
+    border-radius: 18px !important;
+    padding: 8px 10px 12px !important;
   }
 
   .quick-editor-active .quickCalculatorSheet,
@@ -26,8 +112,8 @@
   }
 
   .quickCalculatorSheet .quickSheetHead {
-    position: sticky;
-    top: -8px;
+    position: sticky !important;
+    top: -8px !important;
   }
 
   .quickCalculatorSheet .quickCalcWorkspace {
@@ -35,22 +121,55 @@
   }
 
   .quickCalculatorSheet .quickRates {
-    max-height: none;
+    max-height: none !important;
   }
 
+  /* En móvil también deben verse las tasas actuales, no solo los equivalentes. */
+  .quickCalculatorSheet .quickRateList,
   .quickCalculatorSheet .quickEquivalentBlock {
     display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+  }
+
+  .quickCalculatorSheet .quickRateList > button,
+  .quickCalculatorSheet .quickEquivalentBlock > button {
+    min-height: 36px !important;
+    padding: 6px 8px !important;
+  }
+
+  .quickCalculatorSheet .quickRateList > button span,
+  .quickCalculatorSheet .quickRateList > button strong,
+  .quickCalculatorSheet .quickEquivalentBlock > button span,
+  .quickCalculatorSheet .quickEquivalentBlock > button strong {
+    font-size: .71rem !important;
+  }
+
+  .quickCalculatorSheet .quickKeypad button {
+    height: 34px !important;
   }
 }
 
 @media (max-width: 390px) {
+  .quickDock button span {
+    font-size: .49rem !important;
+  }
+
   .quickCalculatorSheet,
   .quickMoreSheet {
+    left: 6px !important;
+    right: 6px !important;
     max-height: min(78vh, 540px) !important;
+    padding: 7px 8px 10px !important;
   }
 
   .quick-editor-active .quickCalculatorSheet,
   .quick-editor-active .quickMoreSheet {
     max-height: calc(100dvh - 18px - env(safe-area-inset-bottom)) !important;
+  }
+
+  .quickCalculatorSheet .quickKeypad button {
+    height: 32px !important;
+    font-size: .8rem !important;
   }
 }
