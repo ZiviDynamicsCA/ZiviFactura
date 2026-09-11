@@ -152,7 +152,6 @@ function setReactInputValue(input: HTMLInputElement, value: number) {
   setter?.call(input, String(Number(value.toFixed(6))))
   input.dispatchEvent(new Event('input', { bubbles: true }))
   input.dispatchEvent(new Event('change', { bubbles: true }))
-  input.focus()
 }
 
 function clickWorkspace(workspace: WorkspaceKey) {
@@ -338,7 +337,10 @@ export default function QuickTools() {
 
       <div className="quickCalcWorkspace">
         <div className="quickCalcMain">
-          <label className="quickExpression"><span>Operación</span><input autoFocus inputMode="decimal" value={expression} onChange={event => setExpression(event.target.value)} placeholder="Ej. 4,80 × 150"/></label>
+          <label className="quickExpression">
+            <span>Operación</span>
+            <input readOnly inputMode="none" aria-readonly="true" value={expression} onFocus={event => event.currentTarget.blur()} onPointerDown={event => event.preventDefault()} placeholder="Usa los botones de la calculadora"/>
+          </label>
           <div className="quickResult"><span>{primaryLabel}</span><strong>{previewValue == null ? '—' : formatValue(previewValue, previewCurrency)}</strong><button type="button" disabled={previewValue == null} onClick={() => previewValue != null && void copyNumber(previewValue)}><Copy size={16}/>Copiar</button>{primaryMeta && <small className="quickResultMeta">{primaryMeta}</small>}</div>
           {isPriceCalculator && result != null && <div className="quickSourceResult"><span>Valor que se aplicará al precio unitario</span><strong>{formatValue(result, currency)}</strong></div>}
           <div className="quickCurrencyRow"><span>Moneda del cálculo</span><div>{calcCurrencies.map(item => <button type="button" className={currency === item ? 'active' : ''} key={item} onClick={() => setCurrency(item)}>{item}</button>)}</div></div>
