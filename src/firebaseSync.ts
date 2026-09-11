@@ -1,10 +1,18 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
-import { db, defaultCompany } from './db'
+import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
+import { db, defaultCompany, invoiceLogicalKeyFor, makeSyncId } from './db'
 import { firestore } from './firebase'
 import type { Client, Company, Invoice, Payment, Product } from './types'
 
 export type SyncState = 'idle' | 'syncing' | 'synced' | 'error'
 type StatusCallback = (state: SyncState, message?: string) => void
+
+type SyncableRecord = {
+  id?: number
+  syncId?: string
+  companyId?: number
+  createdAt?: string
+  updatedAt?: string
+}
 
 let activeUid: string | null = null
 let applyingRemote = false
@@ -12,25 +20,18 @@ let syncTimer: number | undefined
 let statusCallback: StatusCallback | null = null
 
 const clean = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T
-const safeKey = (value: string) => encodeURIComponent(value.trim().toLowerCase()).slice(0, 900) || 'sin-id'
+const safeKey = (value: string) => encodeURIComponent(value.trim()).slice(0, 900) || makeSyncId('doc')
 const companyIdOf = (row?: { companyId?: number } | null) => Number(row?.companyId) || 1
-const normalizeInvoiceNumber = (value = '') => {
-  const compact = value.trim().toLowerCase().replace(/\s+/g, '')
-  const match = compact.match(/^([^0-9]*)([0-9]+)$/)
-  if (!match) return compact.replace(/[^a-z0-9]/g, '')
-  const prefix = match[1].replace(/[^a-z0-9]/g, '')
-  const sequence = String(Number(match[2]))
-  return `${prefix}:${sequence}`
-}
-const invoiceLogicalKey = (invoice: Invoice) => `${companyIdOf(invoice)}:${normalizeInvoiceNumber(invoice.number)}`
-const invoiceKey = (invoice: Invoice) => safeKey(invoiceLogicalKey(invoice))
-const clientKey = (client: Client) => safeKey(`${companyIdOf(client)}:${client.taxId || client.email || client.phone || client.name || String(client.id || 'cliente')}`)
-const productKey = (product: Product) => safeKey(`${companyIdOf(product)}:${product.name || String(product.id || 'producto')}`)
-const paymentKey = (payment: Payment) => safeKey(`${companyIdOf(payment)}:${payment.key}`)
 const recordTime = (row?: { updatedAt?: string; createdAt?: string } | null) => Date.parse(row?.updatedAt || row?.createdAt || '') || 0
+const newest = <T extends { updatedAt?: string; createdAt?: string }>(a: T, b: T) => recordTime(a) >= recordTime(b) ? a : b
+const remoteId = (prefix: string, record: { syncId?: string }) => safeKey(record.syncId || makeSyncId(prefix))
+
+function withSyncId<T extends SyncableRecord>(record: T, prefix: string): T {
+  return { ...record, syncId: record.syncId || makeSyncId(prefix), companyId: companyIdOf(record) }
+}
 
 function companyForCloud(company: Company) {
-  const copy = clean(company) as Company
+  const copy = clean({ ...company, syncId: company.syncId || `company_${company.id || 1}` }) as Company
   delete copy.logoDataUrl
   return copy
 }
@@ -40,10 +41,40 @@ function isDefaultCompany(company?: Company) {
   return !company.taxId && !company.phone && !company.email && !company.address && (!company.name || company.name === defaultCompany.name)
 }
 
+async function ensureLocalSyncIds() {
+  await db.transaction('rw', db.company, db.clients, db.products, db.invoices, db.payments, async () => {
+    await db.company.toCollection().modify(company => { if (!company.syncId) company.syncId = `company_${company.id || 1}` })
+    await db.clients.toCollection().modify(client => {
+      if (!client.companyId) client.companyId = 1
+      if (!client.syncId) client.syncId = makeSyncId('cli')
+      if (!client.updatedAt) client.updatedAt = client.createdAt || new Date().toISOString()
+    })
+    await db.products.toCollection().modify(product => {
+      if (!product.companyId) product.companyId = 1
+      if (!product.syncId) product.syncId = makeSyncId('prd')
+      if (!product.updatedAt) product.updatedAt = product.createdAt || new Date().toISOString()
+    })
+    await db.invoices.toCollection().modify(invoice => {
+      const companyId = companyIdOf(invoice)
+      invoice.companyId = companyId
+      invoice.logicalKey = invoiceLogicalKeyFor({ companyId, number: invoice.number || '' })
+      if (!invoice.syncId) invoice.syncId = makeSyncId('inv')
+    })
+    await db.payments.toCollection().modify(payment => {
+      if (!payment.companyId) payment.companyId = 1
+      if (!payment.syncId) payment.syncId = makeSyncId('pay')
+      if (!payment.key) payment.key = `${payment.companyId}:${payment.invoiceNumber || 'sin-factura'}:${payment.date || payment.createdAt || Date.now()}`
+    })
+  })
+}
+
 async function pushCompanies(uid: string) {
   if (!firestore) return
   const companies = await db.company.toArray()
-  await Promise.all(companies.map(company => setDoc(doc(firestore, 'users', uid, 'companies', String(company.id)), companyForCloud(company), { merge: true })))
+  await Promise.all(companies.map(company => {
+    const normalized = { ...company, syncId: company.syncId || `company_${company.id || 1}` }
+    return setDoc(doc(firestore, 'users', uid, 'companies', String(normalized.id || 1)), companyForCloud(normalized), { merge: true })
+  }))
   const main = companies.find(company => company.id === 1)
   if (main) await setDoc(doc(firestore, 'users', uid, 'company', 'main'), companyForCloud(main), { merge: true })
 }
@@ -51,29 +82,44 @@ async function pushCompanies(uid: string) {
 async function pushInvoices(uid: string) {
   if (!firestore) return
   const invoices = await db.invoices.toArray()
-  const canonical = new Map<string, Invoice>()
-  for (const invoice of invoices) {
-    if (!invoice.number?.trim()) continue
-    const key = invoiceLogicalKey(invoice)
-    const previous = canonical.get(key)
-    if (!previous || recordTime(invoice) >= recordTime(previous)) canonical.set(key, invoice)
-  }
-  await Promise.all([...canonical.values()].map(invoice => setDoc(doc(firestore, 'users', uid, 'invoices', invoiceKey(invoice)), clean({ ...invoice, companyId: companyIdOf(invoice), id: undefined }), { merge: true })))
+  await Promise.all(invoices.map(async invoice => {
+    const normalized = withSyncId({ ...invoice, logicalKey: invoiceLogicalKeyFor({ companyId: companyIdOf(invoice), number: invoice.number || '' }) }, 'inv') as Invoice
+    if (!invoice.syncId && invoice.id) await db.invoices.update(invoice.id, { syncId: normalized.syncId, companyId: normalized.companyId, logicalKey: normalized.logicalKey })
+    return setDoc(doc(firestore, 'users', uid, 'invoices', remoteId('inv', normalized)), clean({ ...normalized, id: undefined }), { merge: true })
+  }))
 }
+
 async function pushClients(uid: string) {
   if (!firestore) return
   const clients = await db.clients.toArray()
-  await Promise.all(clients.map(client => setDoc(doc(firestore, 'users', uid, 'clients', clientKey(client)), clean({ ...client, companyId: companyIdOf(client), id: undefined }), { merge: true })))
+  await Promise.all(clients.map(async client => {
+    const normalized = withSyncId(client, 'cli') as Client
+    if (!client.syncId && client.id) await db.clients.update(client.id, { syncId: normalized.syncId, companyId: normalized.companyId })
+    return setDoc(doc(firestore, 'users', uid, 'clients', remoteId('cli', normalized)), clean({ ...normalized, id: undefined }), { merge: true })
+  }))
 }
+
 async function pushProducts(uid: string) {
   if (!firestore) return
   const products = await db.products.toArray()
-  await Promise.all(products.map(product => setDoc(doc(firestore, 'users', uid, 'products', productKey(product)), clean({ ...product, companyId: companyIdOf(product), id: undefined }), { merge: true })))
+  await Promise.all(products.map(async product => {
+    const normalized = withSyncId(product, 'prd') as Product
+    if (!product.syncId && product.id) await db.products.update(product.id, { syncId: normalized.syncId, companyId: normalized.companyId })
+    return setDoc(doc(firestore, 'users', uid, 'products', remoteId('prd', normalized)), clean({ ...normalized, id: undefined }), { merge: true })
+  }))
 }
+
 async function pushPayments(uid: string) {
   if (!firestore) return
   const payments = await db.payments.toArray()
-  await Promise.all(payments.map(payment => setDoc(doc(firestore, 'users', uid, 'payments', paymentKey(payment)), clean({ ...payment, companyId: companyIdOf(payment), id: undefined }), { merge: true })))
+  await Promise.all(payments.map(async payment => {
+    const normalized = withSyncId({
+      ...payment,
+      key: payment.key || `${companyIdOf(payment)}:${payment.invoiceNumber || 'sin-factura'}:${payment.date || payment.createdAt || Date.now()}`,
+    }, 'pay') as Payment
+    if ((!payment.syncId || !payment.key) && payment.id) await db.payments.update(payment.id, { syncId: normalized.syncId, companyId: normalized.companyId, key: normalized.key })
+    return setDoc(doc(firestore, 'users', uid, 'payments', remoteId('pay', normalized)), clean({ ...normalized, id: undefined }), { merge: true })
+  }))
 }
 
 async function pullCompanies(uid: string) {
@@ -83,137 +129,84 @@ async function pullCompanies(uid: string) {
     const legacy = await getDoc(doc(firestore, 'users', uid, 'company', 'main'))
     if (!legacy.exists()) return
     const local = await db.company.get(1)
-    if (isDefaultCompany(local)) await db.company.put({ ...defaultCompany, ...(legacy.data() as Company), id: 1, logoDataUrl: local?.logoDataUrl })
+    if (isDefaultCompany(local)) await db.company.put({ ...defaultCompany, ...(legacy.data() as Company), id: 1, syncId: 'company_1', logoDataUrl: local?.logoDataUrl })
     return
   }
+
   for (const snapshot of snapshots.docs) {
     const remote = snapshot.data() as Company
     const id = Number(remote.id || snapshot.id) || 1
     const local = await db.company.get(id)
-    if (!local || isDefaultCompany(local)) await db.company.put({ ...defaultCompany, ...remote, id, logoDataUrl: local?.logoDataUrl })
+    const incoming = { ...defaultCompany, ...remote, id, syncId: remote.syncId || `company_${id}`, logoDataUrl: local?.logoDataUrl }
+    if (!local || isDefaultCompany(local)) await db.company.put(incoming)
+    else if (recordTime(incoming) > recordTime(local)) await db.company.put({ ...local, ...incoming, logoDataUrl: local.logoDataUrl })
   }
 }
 
-async function dedupeLocalInvoices() {
-  const rows = await db.invoices.toArray()
-  const groups = new Map<string, Invoice[]>()
-  for (const invoice of rows) {
-    if (!invoice.number?.trim()) continue
-    const key = invoiceLogicalKey(invoice)
-    const group = groups.get(key) || []
-    group.push(invoice)
-    groups.set(key, group)
+async function upsertBySyncId<T extends SyncableRecord>(
+  table: typeof db.clients | typeof db.products | typeof db.invoices | typeof db.payments,
+  remote: T,
+  snapshotId: string,
+  prefix: string,
+) {
+  const normalized = withSyncId({ ...remote, syncId: remote.syncId || snapshotId }, prefix)
+  const local = await table.where('syncId').equals(normalized.syncId!).first() as T | undefined
+
+  if (!local) {
+    await table.add({ ...normalized, id: undefined } as never)
+    return
   }
 
-  let removed = 0
-  for (const group of groups.values()) {
-    if (group.length < 2) continue
-    const ordered = [...group].sort((a, b) => recordTime(b) - recordTime(a) || Number(a.id || 0) - Number(b.id || 0))
-    const winner = ordered[0]
-    const duplicates = ordered.slice(1).filter(invoice => typeof invoice.id === 'number')
-    if (!winner?.id || !duplicates.length) continue
-
-    await db.invoices.put({ ...winner, id: winner.id, companyId: companyIdOf(winner) })
-    await db.invoices.bulkDelete(duplicates.map(invoice => invoice.id!))
-    removed += duplicates.length
+  if (local.id && newest(normalized, local) === normalized) {
+    await table.put({ ...local, ...normalized, id: local.id } as never)
   }
-  return removed
 }
 
 async function pullInvoices(uid: string) {
   if (!firestore) return
   const snapshots = await getDocs(collection(firestore, 'users', uid, 'invoices'))
-  const locals = await db.invoices.toArray()
-  const byKey = new Map(locals.filter(invoice => invoice.number?.trim()).map(invoice => [invoiceLogicalKey(invoice), invoice]))
-
-  const remoteGroups = new Map<string, typeof snapshots.docs>()
   for (const snapshot of snapshots.docs) {
     const remote = snapshot.data() as Invoice
     if (!remote.number?.trim()) continue
-    const normalized = { ...remote, companyId: companyIdOf(remote) }
-    const key = invoiceLogicalKey(normalized)
-    const group = remoteGroups.get(key) || []
-    group.push(snapshot)
-    remoteGroups.set(key, group)
-  }
-
-  for (const [key, group] of remoteGroups) {
-    const winnerSnapshot = [...group].sort((a, b) => recordTime(b.data() as Invoice) - recordTime(a.data() as Invoice))[0]
-    const remote = winnerSnapshot.data() as Invoice
-    const normalized: Invoice = { ...remote, companyId: companyIdOf(remote), id: undefined }
-    const local = byKey.get(key)
-
-    if (!local) {
-      const id = Number(await db.invoices.add(normalized))
-      byKey.set(key, { ...normalized, id })
-    } else if (recordTime(normalized) > recordTime(local) && local.id) {
-      const updated = { ...normalized, id: local.id }
-      await db.invoices.put(updated)
-      byKey.set(key, updated)
-    }
-
-    const canonicalId = invoiceKey(normalized)
-    await setDoc(doc(firestore, 'users', uid, 'invoices', canonicalId), clean({ ...normalized, id: undefined }), { merge: true })
-    const staleDocs = group.filter(snapshot => snapshot.id !== canonicalId)
-    if (staleDocs.length) {
-      await Promise.all(staleDocs.map(snapshot => deleteDoc(doc(firestore, 'users', uid, 'invoices', snapshot.id))))
-    }
+    const companyId = companyIdOf(remote)
+    await upsertBySyncId(db.invoices, {
+      ...remote,
+      companyId,
+      logicalKey: remote.logicalKey || invoiceLogicalKeyFor({ companyId, number: remote.number || '' }),
+    }, snapshot.id, 'inv')
   }
 }
 
 async function pullClients(uid: string) {
   if (!firestore) return
   const snapshots = await getDocs(collection(firestore, 'users', uid, 'clients'))
-  const locals = await db.clients.toArray()
   for (const snapshot of snapshots.docs) {
     const remote = snapshot.data() as Client
-    const companyId = companyIdOf(remote)
-    const match = locals.find(client => companyIdOf(client) === companyId && ((remote.taxId && client.taxId === remote.taxId) || (remote.email && client.email === remote.email) || client.name.toLowerCase() === remote.name?.toLowerCase()))
-    if (!match) {
-      const id = Number(await db.clients.add({ ...remote, companyId, id: undefined }))
-      locals.push({ ...remote, companyId, id })
-    }
+    if (!remote.name?.trim()) continue
+    await upsertBySyncId(db.clients, remote, snapshot.id, 'cli')
   }
 }
 
 async function pullProducts(uid: string) {
   if (!firestore) return
   const snapshots = await getDocs(collection(firestore, 'users', uid, 'products'))
-  const locals = await db.products.toArray()
   for (const snapshot of snapshots.docs) {
     const remote = snapshot.data() as Product
-    if (!remote.name) continue
-    const companyId = companyIdOf(remote)
-    const match = locals.find(product => companyIdOf(product) === companyId && product.name.toLowerCase() === remote.name.toLowerCase())
-    if (!match) {
-      const id = Number(await db.products.add({ ...remote, companyId, id: undefined }))
-      locals.push({ ...remote, companyId, id })
-    }
+    if (!remote.name?.trim()) continue
+    await upsertBySyncId(db.products, remote, snapshot.id, 'prd')
   }
 }
 
 async function pullPayments(uid: string) {
   if (!firestore) return
   const snapshots = await getDocs(collection(firestore, 'users', uid, 'payments'))
-  const locals = await db.payments.toArray()
-  const byKey = new Map(locals.map(payment => [payment.key, payment]))
   for (const snapshot of snapshots.docs) {
     const remote = snapshot.data() as Payment
-    if (!remote.key || !remote.invoiceNumber) continue
-    const normalized = { ...remote, companyId: companyIdOf(remote) }
-    const local = byKey.get(remote.key)
-    if (!local) {
-      const id = Number(await db.payments.add({ ...normalized, id: undefined }))
-      byKey.set(remote.key, { ...normalized, id })
-      continue
-    }
-    const remoteTime = recordTime(remote)
-    const localTime = recordTime(local)
-    if (remoteTime > localTime && local.id) {
-      const updated = { ...normalized, id: local.id }
-      await db.payments.put(updated)
-      byKey.set(remote.key, updated)
-    }
+    if (!remote.invoiceNumber?.trim()) continue
+    await upsertBySyncId(db.payments, {
+      ...remote,
+      key: remote.key || `${companyIdOf(remote)}:${remote.invoiceNumber}:${remote.date || remote.createdAt || snapshot.id}`,
+    }, snapshot.id, 'pay')
   }
 }
 
@@ -221,18 +214,21 @@ export async function syncFirebaseNow(uid = activeUid || '') {
   if (!firestore || !uid || !navigator.onLine) return
   statusCallback?.('syncing', 'Sincronizando con Firebase…')
   applyingRemote = true
-  let removedInvoices = 0
   try {
+    await ensureLocalSyncIds()
     await Promise.all([pullCompanies(uid), pullInvoices(uid), pullClients(uid), pullProducts(uid), pullPayments(uid)])
-    removedInvoices = await dedupeLocalInvoices()
   } finally {
     applyingRemote = false
   }
+
   try {
     await Promise.all([pushCompanies(uid), pushInvoices(uid), pushClients(uid), pushProducts(uid), pushPayments(uid)])
-    await setDoc(doc(firestore, 'users', uid, 'meta', 'sync'), { lastSyncAt: new Date().toISOString() }, { merge: true })
-    statusCallback?.('synced', removedInvoices > 0 ? `Se corrigieron ${removedInvoices} documentos duplicados.` : 'Datos sincronizados')
-    window.dispatchEvent(new CustomEvent('zivifactura:data-synced', { detail: { removedInvoices } }))
+    await setDoc(doc(firestore, 'users', uid, 'meta', 'sync'), {
+      lastSyncAt: new Date().toISOString(),
+      strategy: 'non-destructive-sync-id-v1',
+    }, { merge: true })
+    statusCallback?.('synced', 'Datos sincronizados sin eliminación automática')
+    window.dispatchEvent(new CustomEvent('zivifactura:data-synced', { detail: { removedInvoices: 0 } }))
   } catch (error) {
     console.warn('[ZiviFactura] Firebase sync:', error)
     statusCallback?.('error', 'No se pudo sincronizar. Se mantiene la copia local.')
@@ -243,23 +239,6 @@ function scheduleSync() {
   if (applyingRemote || !activeUid) return
   if (syncTimer) window.clearTimeout(syncTimer)
   syncTimer = window.setTimeout(() => { if (activeUid) void syncFirebaseNow(activeUid) }, 900)
-}
-
-async function removeInvoice(uid: string, invoice?: Invoice) {
-  if (!firestore || !invoice?.number) return
-  await deleteDoc(doc(firestore, 'users', uid, 'invoices', invoiceKey(invoice)))
-}
-async function removeClient(uid: string, client?: Client) {
-  if (!firestore || !client) return
-  await deleteDoc(doc(firestore, 'users', uid, 'clients', clientKey(client)))
-}
-async function removeProduct(uid: string, product?: Product) {
-  if (!firestore || !product) return
-  await deleteDoc(doc(firestore, 'users', uid, 'products', productKey(product)))
-}
-async function removePayment(uid: string, payment?: Payment) {
-  if (!firestore || !payment?.key) return
-  await deleteDoc(doc(firestore, 'users', uid, 'payments', paymentKey(payment)))
 }
 
 db.company.hook('creating', () => scheduleSync())
@@ -273,10 +252,8 @@ db.invoices.hook('updating', () => scheduleSync())
 db.payments.hook('creating', () => scheduleSync())
 db.payments.hook('updating', () => scheduleSync())
 
-db.invoices.hook('deleting', (_key, invoice) => { if (!applyingRemote && activeUid) void removeInvoice(activeUid, invoice).finally(scheduleSync) })
-db.clients.hook('deleting', (_key, client) => { if (!applyingRemote && activeUid) void removeClient(activeUid, client).finally(scheduleSync) })
-db.products.hook('deleting', (_key, product) => { if (!applyingRemote && activeUid) void removeProduct(activeUid, product).finally(scheduleSync) })
-db.payments.hook('deleting', (_key, payment) => { if (!applyingRemote && activeUid) void removePayment(activeUid, payment).finally(scheduleSync) })
+// Data-safety policy: deletes are not propagated to Firestore here.
+// The next production step is a soft-delete/trash workflow with audit history.
 
 export function startFirebaseSync(uid: string, callback?: StatusCallback) {
   activeUid = uid
