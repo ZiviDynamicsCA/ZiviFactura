@@ -1,4 +1,4 @@
-const CACHE = 'zivifactura-shell-v43'
+const CACHE = 'zivifactura-shell-v44'
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest?v=43',
@@ -44,8 +44,6 @@ self.addEventListener('fetch', event => {
   }
 
   event.respondWith((async () => {
-    const cached = await caches.match(request)
-    if (cached) return cached
     try {
       const fresh = await fetch(request)
       if (fresh && fresh.ok && fresh.type === 'basic') {
@@ -54,7 +52,8 @@ self.addEventListener('fetch', event => {
       }
       return fresh
     } catch (_) {
-      return Response.error()
+      const cached = await caches.match(request)
+      return cached || Response.error()
     }
   })())
 })
