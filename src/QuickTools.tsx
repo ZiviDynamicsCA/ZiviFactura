@@ -78,6 +78,12 @@ function evaluateExpression(raw: string): number | null {
   }
 }
 
+function parseInputNumber(raw: string) {
+  const value = normalizeExpression(raw).replace(/[^0-9.-]/g, '')
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 function locale(value: number, digits = 2) {
   return Number(value).toLocaleString('es-VE', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
@@ -132,7 +138,7 @@ function convert(value: number, from: CalcCurrency, to: CalcCurrency, rates: Liv
 }
 
 function detectInvoiceCurrency(): CalcCurrency {
-  const selects = Array.from(document.querySelectorAll<HTMLSelectElement>('.editorMain select'))
+  const selects = Array.from(document.querySelectorAll<HTMLSelectElement>('.editorGrid select, .editorMain select'))
   const currencySelect = selects.find(select => {
     const values = Array.from(select.options).map(option => option.value)
     return values.includes('USD') && values.includes('VES') && values.includes('EUR')
@@ -162,7 +168,7 @@ function clickAppMode(label: 'Inicio' | 'Tasas' | 'Configuración') {
   window.setTimeout(() => {
     const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.top nav button'))
     buttons.find(button => button.textContent?.includes(label))?.click()
-  }, 50)
+  }, 40)
 }
 
 function clickNewDocument() {
@@ -175,6 +181,7 @@ function clickNewDocument() {
 
 export default function QuickTools() {
   const [available, setAvailable] = useState(false)
+  const [inEditor, setInEditor] = useState(false)
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceKey>('billing')
   const [calculatorOpen, setCalculatorOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -196,7 +203,7 @@ export default function QuickTools() {
     ? previewValue == null
       ? 'Actualiza las tasas para poder mostrar la conversión.'
       : isPriceCalculator
-        ? `Precio unitario original: ${formatValue(result, currency)} · ${rateName(currency)} ${currency === 'VES' ? '' : sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
+        ? `Precio original: ${formatValue(result, currency)} · ${rateName(currency)} ${currency === 'VES' ? '' : sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
         : `Base: ${formatValue(result, currency)} · ${rateName(currency)} ${currency === 'VES' ? '' : sourceRate ? `${locale(sourceRate)} Bs` : 'no disponible'}`
     : ''
 
@@ -213,9 +220,14 @@ export default function QuickTools() {
   useEffect(() => {
     const sync = () => {
       const nav = document.querySelector('.workspaceNav')
+      const editor = document.querySelector('.editorGrid')
       const nextAvailable = Boolean(nav)
+      const nextInEditor = Boolean(editor)
       setAvailable(nextAvailable)
+      setInEditor(nextInEditor)
       document.body.classList.toggle('quick-nav-active', nextAvailable)
+      document.body.classList.toggle('quick-editor-active', nextInEditor)
+
       if (nav) {
         const buttons = Array.from(nav.querySelectorAll<HTMLButtonElement>('button'))
         const index = buttons.findIndex(button => button.classList.contains('active'))
@@ -235,10 +247,11 @@ export default function QuickTools() {
         button.addEventListener('click', event => {
           event.preventDefault()
           event.stopPropagation()
+          const parsed = parseInputNumber(input.value)
           setContextInput(input)
           setContextTitle('Calculadora de precio')
           setCurrency(detectInvoiceCurrency())
-          setExpression(input.value && Number(input.value.replace(',', '.')) !== 0 ? input.value : '')
+          setExpression(parsed > 0 ? String(parsed).replace('.', ',') : '')
           setMoreOpen(false)
           setCalculatorOpen(true)
         })
@@ -253,7 +266,7 @@ export default function QuickTools() {
     return () => {
       observer.disconnect()
       observerRef.current = null
-      document.body.classList.remove('quick-nav-active')
+      document.body.classList.remove('quick-nav-active', 'quick-editor-active')
     }
   }, [])
 
@@ -282,9 +295,7 @@ export default function QuickTools() {
   }
 
   function navigate(workspace: WorkspaceKey) {
-    setCalculatorOpen(false)
-    setMoreOpen(false)
-    setContextInput(null)
+    closeSheets()
     clickWorkspace(workspace)
     if (workspace === 'billing') window.setTimeout(() => clickAppMode('Inicio'), 10)
     window.setTimeout(() => setActiveWorkspace(workspace), 80)
@@ -306,7 +317,7 @@ export default function QuickTools() {
     closeSheets()
   }
 
-  if (!available) return null
+  if (!available && !calculatorOpen) return null
 
   const rateRows = [
     { label: 'USD · BCV', value: Number(rates?.usdBcv) || 0 },
@@ -343,13 +354,13 @@ export default function QuickTools() {
 
         <aside className="quickRates">
           <div className="quickRatesHead"><div><span>TASAS ACTUALES</span><strong>Consulta y copia</strong></div><button type="button" disabled={loadingRates} onClick={() => void refreshRates()} title="Actualizar tasas"><RefreshCw size={17} className={loadingRates ? 'spin' : ''}/></button></div>
-          <div className="quickRateList">{rateRows.length ? rateRows.map(row => <button type="button" key={row.label} onClick={() => void copyNumber(row.value)}><span>{row.label}</span><strong>{locale(row.value)} Bs</strong><Copy size={14}/></button>) : <p>No hay tasas disponibles en caché. Pulsa actualizar.</p>}</div>
+          <div className="quickRateList">{rateRows.length ? rateRows.map(row => <button type="button" key={row.label} onClick={() => void copyNumber(row.value)}><span>{row.label}</span><strong>{locale(row.value)} Bs</strong><Copy size={14}/></button>) : <p>No hay tasas disponibles. Pulsa actualizar.</p>}</div>
           {result != null && <div className="quickEquivalentBlock"><span>EQUIVALENTES DEL RESULTADO</span>{equivalents.filter(item => item.currency !== currency).map(item => <button type="button" key={item.currency} onClick={() => void copyNumber(item.value)}><span>{item.currency}</span><strong>{formatValue(item.value, item.currency)}</strong><Copy size={14}/></button>)}</div>}
         </aside>
       </div>
     </section>}
 
-    {moreOpen && <section className="quickMoreSheet">
+    {!inEditor && moreOpen && <section className="quickMoreSheet">
       <div className="quickSheetHandle"/>
       <header><div><span>MÁS HERRAMIENTAS</span><h2>Administración y configuración</h2></div><button type="button" onClick={closeSheets} aria-label="Cerrar"><X size={19}/></button></header>
       <div className="quickMoreGrid">
@@ -360,14 +371,14 @@ export default function QuickTools() {
       </div>
     </section>}
 
-    <nav className="quickDock" aria-label="Navegación principal">
+    {!inEditor && <nav className="quickDock" aria-label="Navegación principal">
       <button type="button" className={activeWorkspace === 'billing' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('billing')}><ReceiptText/><span>Inicio</span></button>
       <button type="button" className={activeWorkspace === 'receivables' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('receivables')}><DollarSign/><span>Por cobrar</span></button>
       <button type="button" className={activeWorkspace === 'payments' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('payments')}><WalletCards/><span>Cobros</span></button>
-      <button type="button" className="quickDockCreate" onClick={clickNewDocument} aria-label="Nueva factura"><FilePlus2/><span>Nueva</span></button>
+      <button type="button" className="quickDockCreate" onClick={clickNewDocument}><FilePlus2/><span>Nueva</span></button>
       <button type="button" className={activeWorkspace === 'income' && !calculatorOpen && !moreOpen ? 'active' : ''} onClick={() => navigate('income')}><Wallet/><span>Ingresos</span></button>
       <button type="button" className={calculatorOpen ? 'active tool' : 'tool'} onClick={openGlobalCalculator}><Calculator/><span>Tasas</span></button>
       <button type="button" className={moreOpen ? 'active' : ''} onClick={() => { setCalculatorOpen(false); setContextInput(null); setMoreOpen(value => !value) }}><MoreHorizontal/><span>Más</span></button>
-    </nav>
+    </nav>}
   </>
 }
