@@ -1,4 +1,4 @@
-/* Ajustes móviles finales para calculadora, dock inferior y experiencia de factura. */
+/* Ajustes móviles finales para calculadora, dock inferior y experiencia principal. */
 .quickExpression input[readonly] {
   caret-color: transparent;
   cursor: default;
@@ -13,6 +13,15 @@
   touch-action: pan-y;
 }
 
+/* El hero promocional ya no se muestra en el dashboard operativo. */
+.app .page > .hero {
+  display: none !important;
+}
+
+.app .page > .metrics {
+  margin-top: 18px !important;
+}
+
 /* Teclado interno en 4 columnas reales: 7-8-9-dividir / 4-5-6-multiplicar / 1-2-3-restar. */
 .quickKeypad {
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
@@ -20,28 +29,28 @@
 
 @media (max-width: 760px) {
   body.quick-nav-active {
-    padding-bottom: 76px !important;
+    padding-bottom: 82px !important;
   }
 
   body.quick-nav-active.quick-editor-active {
     padding-bottom: 10px !important;
   }
 
-  /* Dock móvil: una sola fila compacta. Tasas queda dentro de Más. */
+  /* Dock móvil firme: 7 botones reales en una sola fila. */
   .quickDock {
     display: grid !important;
-    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
     grid-template-rows: 1fr !important;
-    grid-auto-flow: column !important;
-    grid-auto-rows: 0 !important;
+    grid-auto-flow: unset !important;
+    grid-auto-rows: 1fr !important;
     left: 6px !important;
     right: 6px !important;
     bottom: 7px !important;
     transform: none !important;
     width: auto !important;
-    min-height: 66px !important;
-    max-height: 82px !important;
-    padding: 5px 4px calc(5px + env(safe-area-inset-bottom)) !important;
+    min-height: 68px !important;
+    max-height: 84px !important;
+    padding: 5px 3px calc(5px + env(safe-area-inset-bottom)) !important;
     gap: 1px !important;
     overflow: hidden !important;
     align-items: stretch !important;
@@ -50,14 +59,15 @@
   .quickDock > button {
     grid-row: 1 !important;
     min-width: 0 !important;
-    width: auto !important;
+    width: 100% !important;
     max-width: 100% !important;
     min-height: 52px !important;
+    max-height: 64px !important;
     flex: none !important;
     display: flex !important;
     overflow: hidden !important;
-    padding-left: 1px !important;
-    padding-right: 1px !important;
+    padding: 3px 0 !important;
+    gap: 3px !important;
   }
 
   .quickDock > button:nth-child(1) { grid-column: 1 !important; }
@@ -65,34 +75,48 @@
   .quickDock > button:nth-child(3) { grid-column: 3 !important; }
   .quickDock > button:nth-child(4) { grid-column: 4 !important; }
   .quickDock > button:nth-child(5) { grid-column: 5 !important; }
-  .quickDock > button:nth-child(6) { display: none !important; }
-  .quickDock > button:nth-child(7) { grid-column: 6 !important; }
+  .quickDock > button:nth-child(6) { grid-column: 6 !important; display: flex !important; }
+  .quickDock > button:nth-child(7) { grid-column: 7 !important; }
 
   .quickDock button svg {
-    width: 17px !important;
-    height: 17px !important;
+    width: 16px !important;
+    height: 16px !important;
+    flex: 0 0 16px !important;
   }
 
   .quickDock button span {
-    font-size: .50rem !important;
+    display: block !important;
+    font-size: .46rem !important;
     line-height: 1 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    text-overflow: clip !important;
     max-width: 100% !important;
+    letter-spacing: -.01em !important;
   }
 
   .quickDock .quickDockCreate {
-    min-height: 58px !important;
-    margin-top: -10px !important;
+    min-height: 60px !important;
+    max-height: 68px !important;
+    margin-top: -11px !important;
     border-radius: 15px !important;
+    box-shadow: 0 12px 28px rgba(14, 165, 233, .34) !important;
+  }
+
+  .quickDock .quickDockCreate svg {
+    width: 19px !important;
+    height: 19px !important;
+  }
+
+  .quickDock .quickDockCreate span {
+    font-size: .49rem !important;
   }
 
   .quickCalculatorSheet,
   .quickMoreSheet {
     left: 8px !important;
     right: 8px !important;
-    bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    bottom: calc(86px + env(safe-area-inset-bottom)) !important;
     transform: none !important;
     width: auto !important;
     max-height: min(76vh, 560px) !important;
@@ -192,8 +216,24 @@
 }
 
 @media (max-width: 390px) {
+  .quickDock {
+    left: 4px !important;
+    right: 4px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+  }
+
   .quickDock button span {
-    font-size: .47rem !important;
+    font-size: .425rem !important;
+  }
+
+  .quickDock button svg {
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  .quickDock .quickDockCreate span {
+    font-size: .45rem !important;
   }
 
   .quickCalculatorSheet,
