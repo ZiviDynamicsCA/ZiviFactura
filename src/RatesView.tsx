@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRightLeft, Calculator, Check, Copy, RefreshCw, TrendingUp } from 'lucide-react'
 import type { RateSnapshot, RateSource } from './types'
-import { amountToVes, fetchLiveRates, formatRate, getCachedRates, getRateValue, pivotConversions, refreshRatesIfDue } from './rates'
+import { amountToVes, bcvAverageRate, fetchLiveRates, formatRate, getCachedRates, getRateValue, pivotConversions, refreshRatesIfDue } from './rates'
 import './rates.css'
 
 type Props = {
@@ -75,18 +75,21 @@ export default function RatesView({ onCreateInvoiceWithRate, notify }: Props) {
   const ves = useMemo(() => amountToVes(amountNumber, source, rates, customNumber), [amountNumber, source, rates, customNumber])
   const converted = useMemo(() => pivotConversions(ves, rates), [ves, rates])
   const updated = rates?.capturedAt ? new Date(rates.capturedAt).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }) : 'Sin actualización'
+  const bcvAverage = bcvAverageRate(rates)
 
   const cards: Array<{ key: RateSource; title: string; value?: number; note: string }> = [
-    { key: 'bcv_usd', title: 'Dólar BCV', value: rates?.usdBcv, note: 'Referencia oficial' },
-    { key: 'bcv_eur', title: 'Euro BCV', value: rates?.eurBcv, note: 'Referencia oficial' },
+    { key: 'bcv_usd', title: 'BCV dólar', value: rates?.usdBcv, note: 'Referencia oficial' },
+    { key: 'bcv_eur', title: 'BCV euro', value: rates?.eurBcv, note: 'Referencia oficial' },
+    { key: 'bcv_average', title: 'Promedio BCV USD/EUR', value: bcvAverage, note: 'Promedio simple de ambas tasas' },
     { key: 'binance', title: 'USDT Binance', value: rates?.binanceBuy, note: 'P2P · compra' },
-    { key: 'usdt_average', title: 'Promedio USDT', value: rates?.usdtAverage, note: 'Binance + Bybit' },
+    { key: 'usdt_average', title: 'USDT promedio', value: rates?.usdtAverage, note: 'Promedio P2P' },
   ]
 
   const results = [
     { key: 'ves', label: 'Bolívares', value: converted.VES, display: formatNumber(converted.VES, 'VES') },
-    { key: 'usd', label: 'Dólar BCV', value: converted.USD, display: formatNumber(converted.USD, 'USD') },
-    { key: 'eur', label: 'Euro BCV', value: converted.EUR, display: formatNumber(converted.EUR, 'EUR') },
+    { key: 'usd', label: 'BCV dólar', value: converted.USD, display: formatNumber(converted.USD, 'USD') },
+    { key: 'eur', label: 'BCV euro', value: converted.EUR, display: formatNumber(converted.EUR, 'EUR') },
+    { key: 'bcv-average', label: 'Promedio BCV USD/EUR', value: converted.BCV_AVERAGE, display: `${formatNumber(converted.BCV_AVERAGE)} prom.` },
     { key: 'binance', label: 'USDT Binance', value: converted.USDT_BINANCE, display: `${formatNumber(converted.USDT_BINANCE)} USDT` },
     { key: 'average', label: 'USDT promedio', value: converted.USDT_AVERAGE, display: `${formatNumber(converted.USDT_AVERAGE)} USDT` },
   ]
@@ -106,11 +109,11 @@ export default function RatesView({ onCreateInvoiceWithRate, notify }: Props) {
     </article>)}</section>
 
     <section className="calculatorCard card">
-      <div className="calculatorHead"><div><span>CALCULADORA DE CAMBIO</span><h2>Convierte cualquier monto entre VES, USD, EUR y USDT.</h2></div><Calculator size={28}/></div>
+      <div className="calculatorHead"><div><span>CALCULADORA DE CAMBIO</span><h2>Convierte cualquier monto entre VES, USD, EUR, promedio BCV y USDT.</h2></div><Calculator size={28}/></div>
       <div className="calcGrid">
         <label className="field"><span>Monto</span><input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0,00"/></label>
         <label className="field"><span>Moneda / tasa de origen</span><select value={source} onChange={e => setSource(e.target.value as RateSource | 'ves')}>
-          <option value="ves">Bolívares (VES)</option><option value="bcv_usd">USD · BCV dólar</option><option value="bcv_eur">EUR · BCV euro</option><option value="binance">USDT · Binance P2P</option><option value="usdt_average">USDT · Promedio P2P</option><option value="custom">Tasa personalizada</option>
+          <option value="ves">Bolívares (VES)</option><option value="bcv_usd">USD · BCV dólar</option><option value="bcv_eur">EUR · BCV euro</option><option value="bcv_average">Promedio · BCV USD/EUR</option><option value="binance">USDT · Binance</option><option value="usdt_average">USDT · Promedio</option><option value="custom">Tasa personalizada</option>
         </select></label>
         {source === 'custom' && <label className="field"><span>Tasa personalizada (Bs por unidad)</span><input inputMode="decimal" value={customRate} onChange={e => setCustomRate(e.target.value)}/></label>}
       </div>
@@ -118,7 +121,7 @@ export default function RatesView({ onCreateInvoiceWithRate, notify }: Props) {
       <div className="conversionResults">
         {results.map(result => <div key={result.key}><span>{result.label}</span><div className="resultValue"><strong>{result.display}</strong><button className="copyValue dark" disabled={!Number.isFinite(result.value)} title={`Copiar ${result.label}`} aria-label={`Copiar ${result.label}`} onClick={() => copyAmount(`result-${result.key}`, result.value, result.label)}>{copied === `result-${result.key}` ? <Check size={16}/> : <Copy size={16}/>}</button></div></div>)}
       </div>
-      <p className="ratesFootnote">Las tasas P2P son referenciales y pueden variar según monto, anunciante y método de pago. La tasa Euro BCV usa la fuente oficial y, si el portal del BCV no responde al servidor, un respaldo que replica la cotización oficial. Para documentos fiscales, valida la tasa aplicable según la normativa vigente.</p>
+      <p className="ratesFootnote">Las tasas P2P son referenciales y pueden variar según monto, anunciante y método de pago. El promedio BCV USD/EUR es un promedio simple entre ambas referencias oficiales y sirve como apoyo administrativo, no como sustituto de la tasa fiscal aplicable. Para documentos fiscales, valida la tasa aplicable según la normativa vigente.</p>
     </section>
   </div>
 }
