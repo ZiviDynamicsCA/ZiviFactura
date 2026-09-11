@@ -1,4 +1,5 @@
 import { db } from './db'
+import { isVisiblePayment } from './dataIntegrity'
 import { totals } from './pdf'
 import { getRateValue } from './rates'
 import type { Invoice, Payment, PaymentMethodKey, RateSnapshot } from './types'
@@ -54,8 +55,12 @@ export function paymentAmountVes(amountApplied: number, invoiceCurrency: string,
   return invoiceCurrency.toUpperCase() === 'VES' ? amount : amount * Math.max(0, Number(rateValue) || 0)
 }
 
+export function visiblePayments(payments: Payment[]) {
+  return payments.filter(isVisiblePayment)
+}
+
 export function appliedForInvoice(invoiceNumber: string, payments: Payment[]) {
-  return payments.filter(payment => payment.invoiceNumber === invoiceNumber).reduce((sum, payment) => sum + (Number(payment.amountApplied) || 0), 0)
+  return visiblePayments(payments).filter(payment => payment.invoiceNumber === invoiceNumber).reduce((sum, payment) => sum + (Number(payment.amountApplied) || 0), 0)
 }
 
 export function balanceForInvoice(invoice: Invoice, payments: Payment[]) {
@@ -71,7 +76,9 @@ export function receivableBalanceVes(invoice: Invoice, payments: Payment[], rate
 
 export async function reconcileInvoiceStatus(invoice: Invoice) {
   if (!invoice.id || invoice.status === 'cancelled' || invoice.status === 'draft') return
-  const payments = await db.payments.where('invoiceNumber').equals(invoice.number).toArray()
+  const companyId = Number(invoice.companyId) || 1
+  const payments = (await db.payments.where('invoiceNumber').equals(invoice.number).toArray())
+    .filter(payment => (Number(payment.companyId) || 1) === companyId && isVisiblePayment(payment))
   const applied = appliedForInvoice(invoice.number, payments)
   const total = totals(invoice).total
   const nextStatus = applied + 0.005 >= total ? 'paid' : 'issued'
