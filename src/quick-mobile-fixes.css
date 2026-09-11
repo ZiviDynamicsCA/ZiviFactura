@@ -1,0 +1,56 @@
+/* Ajustes móviles finales para calculadora: sin teclado nativo y con scroll interno útil. */
+.quickExpression input[readonly] {
+  caret-color: transparent;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.quickCalculatorSheet,
+.quickMoreSheet {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+@media (max-width: 760px) {
+  .quickCalculatorSheet,
+  .quickMoreSheet {
+    max-height: min(76vh, 560px) !important;
+  }
+
+  .quick-editor-active .quickCalculatorSheet,
+  .quick-editor-active .quickMoreSheet {
+    bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    max-height: calc(100dvh - 24px - env(safe-area-inset-bottom)) !important;
+  }
+
+  .quickCalculatorSheet .quickSheetHead {
+    position: sticky;
+    top: -8px;
+  }
+
+  .quickCalculatorSheet .quickCalcWorkspace {
+    grid-template-columns: 1fr !important;
+  }
+
+  .quickCalculatorSheet .quickRates {
+    max-height: none;
+  }
+
+  .quickCalculatorSheet .quickEquivalentBlock {
+    display: grid !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .quickCalculatorSheet,
+  .quickMoreSheet {
+    max-height: min(78vh, 540px) !important;
+  }
+
+  .quick-editor-active .quickCalculatorSheet,
+  .quick-editor-active .quickMoreSheet {
+    max-height: calc(100dvh - 18px - env(safe-area-inset-bottom)) !important;
+  }
+}
