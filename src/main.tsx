@@ -20,6 +20,8 @@ import './polish-v24.css'
 import './polish-v27.css'
 import './polish-v28.css'
 import './auth-v29.css'
+import './quick-tools-fixes.css'
+import './quickToolsRuntimeFixes'
 
 type DeferredInstallPrompt = Event & {
   prompt?: () => Promise<void>
