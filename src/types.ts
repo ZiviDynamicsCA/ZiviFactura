@@ -114,6 +114,10 @@ export interface Payment {
   id?: number
   syncId?: string
   companyId?: number
+  originalCompanyId?: number
+  technicalDuplicateOf?: string
+  technicalDuplicateHiddenAt?: string
+  technicalDuplicateSignature?: string
   key: string
   invoiceNumber: string
   invoiceCurrency: string
