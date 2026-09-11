@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
-import { restoreArchivedTechnicalRecords } from './dataIntegrity'
+import { uniqueOperationalInvoices, uniqueOperationalPayments } from './dataIntegrity'
 import { db, defaultCompany, invoiceLogicalKeyFor, makeSyncId } from './db'
 import { firestore } from './firebase'
 import type { Client, Company, Invoice, Payment, Product } from './types'
@@ -28,7 +28,7 @@ const newest = <T extends { updatedAt?: string; createdAt?: string }>(a: T, b: T
 const remoteId = (prefix: string, record: { syncId?: string }) => safeKey(record.syncId || makeSyncId(prefix))
 
 function withSyncId<T extends SyncableRecord>(record: T, prefix: string): T {
-  return { ...record, syncId: record.syncId || makeSyncId(prefix), companyId: Math.abs(companyIdOf(record)) || 1 }
+  return { ...record, syncId: record.syncId || makeSyncId(prefix), companyId: companyIdOf(record) }
 }
 
 function companyForCloud(company: Company) {
@@ -56,21 +56,13 @@ async function ensureLocalSyncIds() {
       if (!product.updatedAt) product.updatedAt = product.createdAt || new Date().toISOString()
     })
     await db.invoices.toCollection().modify(invoice => {
-      const companyId = Math.abs(companyIdOf(invoice)) || 1
+      const companyId = companyIdOf(invoice)
       invoice.companyId = companyId
-      invoice.originalCompanyId = undefined
-      invoice.technicalDuplicateOf = undefined
-      invoice.technicalDuplicateHiddenAt = undefined
-      invoice.technicalDuplicateSignature = undefined
       invoice.logicalKey = invoiceLogicalKeyFor({ companyId, number: invoice.number || '' })
       if (!invoice.syncId) invoice.syncId = makeSyncId('inv')
     })
     await db.payments.toCollection().modify(payment => {
-      payment.companyId = Math.abs(companyIdOf(payment)) || 1
-      payment.originalCompanyId = undefined
-      payment.technicalDuplicateOf = undefined
-      payment.technicalDuplicateHiddenAt = undefined
-      payment.technicalDuplicateSignature = undefined
+      if (!payment.companyId) payment.companyId = 1
       if (!payment.syncId) payment.syncId = makeSyncId('pay')
       if (!payment.key) payment.key = `${payment.companyId}:${payment.invoiceNumber || 'sin-factura'}:${payment.date || payment.createdAt || Date.now()}`
     })
@@ -90,11 +82,11 @@ async function pushCompanies(uid: string) {
 
 async function pushInvoices(uid: string) {
   if (!firestore) return
-  const invoices = await db.invoices.toArray()
+  const invoices = uniqueOperationalInvoices(await db.invoices.toArray())
   await Promise.all(invoices.map(async invoice => {
-    const companyId = Math.abs(companyIdOf(invoice)) || 1
+    const companyId = companyIdOf(invoice)
     const normalized = withSyncId({ ...invoice, companyId, logicalKey: invoiceLogicalKeyFor({ companyId, number: invoice.number || '' }) }, 'inv') as Invoice
-    if ((!invoice.syncId || invoice.companyId !== companyId) && invoice.id) await db.invoices.update(invoice.id, { syncId: normalized.syncId, companyId: normalized.companyId, logicalKey: normalized.logicalKey })
+    if (!invoice.syncId && invoice.id) await db.invoices.update(invoice.id, { syncId: normalized.syncId, companyId: normalized.companyId, logicalKey: normalized.logicalKey })
     return setDoc(doc(firestore, 'users', uid, 'invoices', remoteId('inv', normalized)), clean({ ...normalized, id: undefined }), { merge: true })
   }))
 }
@@ -121,15 +113,15 @@ async function pushProducts(uid: string) {
 
 async function pushPayments(uid: string) {
   if (!firestore) return
-  const payments = await db.payments.toArray()
+  const payments = uniqueOperationalPayments(await db.payments.toArray())
   await Promise.all(payments.map(async payment => {
-    const companyId = Math.abs(companyIdOf(payment)) || 1
+    const companyId = companyIdOf(payment)
     const normalized = withSyncId({
       ...payment,
       companyId,
       key: payment.key || `${companyId}:${payment.invoiceNumber || 'sin-factura'}:${payment.date || payment.createdAt || Date.now()}`,
     }, 'pay') as Payment
-    if ((!payment.syncId || !payment.key || payment.companyId !== companyId) && payment.id) await db.payments.update(payment.id, { syncId: normalized.syncId, companyId: normalized.companyId, key: normalized.key })
+    if ((!payment.syncId || !payment.key) && payment.id) await db.payments.update(payment.id, { syncId: normalized.syncId, companyId: normalized.companyId, key: normalized.key })
     return setDoc(doc(firestore, 'users', uid, 'payments', remoteId('pay', normalized)), clean({ ...normalized, id: undefined }), { merge: true })
   }))
 }
@@ -177,19 +169,17 @@ async function upsertBySyncId<T extends SyncableRecord>(
 async function pullInvoices(uid: string) {
   if (!firestore) return
   const snapshots = await getDocs(collection(firestore, 'users', uid, 'invoices'))
-  for (const snapshot of snapshots.docs) {
-    const remote = snapshot.data() as Invoice
-    if (!remote.number?.trim()) continue
-    const companyId = Math.abs(companyIdOf(remote)) || 1
+  const remotes = snapshots.docs
+    .map(snapshot => ({ snapshotId: snapshot.id, data: snapshot.data() as Invoice }))
+    .filter(item => Boolean(item.data.number?.trim()))
+  const uniqueRemotes = uniqueOperationalInvoices(remotes.map(item => ({ ...item.data, syncId: item.data.syncId || item.snapshotId })))
+  for (const remote of uniqueRemotes) {
+    const companyId = companyIdOf(remote)
     await upsertBySyncId(db.invoices, {
       ...remote,
       companyId,
-      originalCompanyId: undefined,
-      technicalDuplicateOf: undefined,
-      technicalDuplicateHiddenAt: undefined,
-      technicalDuplicateSignature: undefined,
       logicalKey: remote.logicalKey || invoiceLogicalKeyFor({ companyId, number: remote.number || '' }),
-    }, snapshot.id, 'inv')
+    }, remote.syncId || makeSyncId('inv'), 'inv')
   }
 }
 
@@ -216,19 +206,17 @@ async function pullProducts(uid: string) {
 async function pullPayments(uid: string) {
   if (!firestore) return
   const snapshots = await getDocs(collection(firestore, 'users', uid, 'payments'))
-  for (const snapshot of snapshots.docs) {
-    const remote = snapshot.data() as Payment
-    if (!remote.invoiceNumber?.trim()) continue
-    const companyId = Math.abs(companyIdOf(remote)) || 1
+  const remotes = snapshots.docs
+    .map(snapshot => ({ snapshotId: snapshot.id, data: snapshot.data() as Payment }))
+    .filter(item => Boolean(item.data.invoiceNumber?.trim()))
+  const uniqueRemotes = uniqueOperationalPayments(remotes.map(item => ({ ...item.data, syncId: item.data.syncId || item.snapshotId })))
+  for (const remote of uniqueRemotes) {
+    const companyId = companyIdOf(remote)
     await upsertBySyncId(db.payments, {
       ...remote,
       companyId,
-      originalCompanyId: undefined,
-      technicalDuplicateOf: undefined,
-      technicalDuplicateHiddenAt: undefined,
-      technicalDuplicateSignature: undefined,
-      key: remote.key || `${companyId}:${remote.invoiceNumber}:${remote.date || remote.createdAt || snapshot.id}`,
-    }, snapshot.id, 'pay')
+      key: remote.key || `${companyId}:${remote.invoiceNumber}:${remote.date || remote.createdAt || remote.syncId || makeSyncId('pay')}`,
+    }, remote.syncId || makeSyncId('pay'), 'pay')
   }
 }
 
@@ -239,7 +227,6 @@ export async function syncFirebaseNow(uid = activeUid || '') {
   try {
     await ensureLocalSyncIds()
     await Promise.all([pullCompanies(uid), pullInvoices(uid), pullClients(uid), pullProducts(uid), pullPayments(uid)])
-    await restoreArchivedTechnicalRecords()
   } finally {
     applyingRemote = false
   }
@@ -248,9 +235,9 @@ export async function syncFirebaseNow(uid = activeUid || '') {
     await Promise.all([pushCompanies(uid), pushInvoices(uid), pushClients(uid), pushProducts(uid), pushPayments(uid)])
     await setDoc(doc(firestore, 'users', uid, 'meta', 'sync'), {
       lastSyncAt: new Date().toISOString(),
-      strategy: 'non-destructive-sync-id-v4-no-auto-archive',
+      strategy: 'read-only-operational-dedupe-v5',
     }, { merge: true })
-    statusCallback?.('synced', 'Datos sincronizados sin eliminación ni archivado automático')
+    statusCallback?.('synced', 'Datos sincronizados con vista operativa protegida')
     window.dispatchEvent(new CustomEvent('zivifactura:data-synced', { detail: { removedInvoices: 0 } }))
   } catch (error) {
     console.warn('[ZiviFactura] Firebase sync:', error)
@@ -275,9 +262,9 @@ db.invoices.hook('updating', () => scheduleSync())
 db.payments.hook('creating', () => scheduleSync())
 db.payments.hook('updating', () => scheduleSync())
 
-// Data-safety policy: deletes, duplicate hiding, and technical archiving are not
-// propagated automatically. Duplicates must be reviewed from a future manual
-// integrity screen with explicit user confirmation.
+// Política de seguridad: la sincronización NO borra, NO archiva y NO restaura
+// registros automáticamente. Para operar, usa una vista deduplicada en lectura.
+// La base completa se conserva para respaldo y revisión manual futura.
 
 export function startFirebaseSync(uid: string, callback?: StatusCallback) {
   activeUid = uid
