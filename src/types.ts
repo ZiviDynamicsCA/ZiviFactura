@@ -20,6 +20,7 @@ export interface RateSnapshot {
 
 export interface Company {
   id: number
+  syncId?: string
   name: string
   taxId: string
   phone: string
@@ -44,6 +45,7 @@ export interface Company {
 
 export interface Client {
   id?: number
+  syncId?: string
   companyId?: number
   name: string
   taxId: string
@@ -51,15 +53,18 @@ export interface Client {
   email: string
   address: string
   createdAt: string
+  updatedAt?: string
 }
 
 export interface Product {
   id?: number
+  syncId?: string
   companyId?: number
   name: string
   price: number
   description?: string
   createdAt: string
+  updatedAt?: string
 }
 
 export interface InvoiceItem {
@@ -71,6 +76,7 @@ export interface InvoiceItem {
 
 export interface Invoice {
   id?: number
+  syncId?: string
   companyId?: number
   logicalKey?: string
   publicShareId?: string
@@ -81,7 +87,7 @@ export interface Invoice {
   dueDate: string
   city: string
   clientId?: number
-  client: Omit<Client, 'id' | 'createdAt' | 'companyId'>
+  client: Omit<Client, 'id' | 'syncId' | 'createdAt' | 'updatedAt' | 'companyId'>
   items: InvoiceItem[]
   discount: number
   taxRate: number
@@ -102,6 +108,7 @@ export interface Invoice {
 
 export interface Payment {
   id?: number
+  syncId?: string
   companyId?: number
   key: string
   invoiceNumber: string
@@ -121,7 +128,7 @@ export interface Payment {
 }
 
 export interface BackupData {
-  version: 1 | 2 | 3
+  version: 1 | 2 | 3 | 4
   exportedAt: string
   company: Company[]
   clients: Client[]
