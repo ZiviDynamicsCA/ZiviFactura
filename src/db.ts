@@ -16,18 +16,27 @@ export function invoiceLogicalKeyFor(row: Pick<Invoice, 'number'> & Partial<Pick
   return `${companyId}:${normalized || 'sin-numero'}`
 }
 
-const invoiceRecordTime = (row?: Partial<Invoice> | null) => Date.parse(row?.updatedAt || row?.createdAt || '') || 0
+function normalizeInvoice(row: Invoice): Invoice {
+  const companyId = Number(row.companyId) || 1
+  return { ...row, companyId, logicalKey: invoiceLogicalKeyFor({ companyId, number: row.number || '' }) }
+}
 
-function canonicalizeInvoices(rows: Invoice[]) {
-  const canonical = new Map<string, Invoice>()
-  for (const row of rows) {
-    const companyId = Number(row.companyId) || 1
-    const logicalKey = invoiceLogicalKeyFor({ companyId, number: row.number || '' })
-    const normalized: Invoice = { ...row, companyId, logicalKey }
-    const previous = canonical.get(logicalKey)
-    if (!previous || invoiceRecordTime(normalized) >= invoiceRecordTime(previous)) canonical.set(logicalKey, normalized)
+function normalizeClient(row: Client): Client {
+  return { ...row, companyId: Number(row.companyId) || 1 }
+}
+
+function normalizeProduct(row: Product): Product {
+  return { ...row, companyId: Number(row.companyId) || 1 }
+}
+
+function normalizePayment(row: Payment): Payment {
+  const now = new Date().toISOString()
+  const companyId = Number(row.companyId) || 1
+  return {
+    ...row,
+    companyId,
+    key: row.key || `${companyId}:${row.invoiceNumber || 'sin-factura'}:${row.date || now}:${row.createdAt || now}`,
   }
-  return [...canonical.values()]
 }
 
 class InvoiceDB extends Dexie {
@@ -50,14 +59,14 @@ class InvoiceDB extends Dexie {
       clients: '++id, name, taxId, phone, email',
       products: '++id, name, price',
       invoices: '++id, number, status, date, client.name, updatedAt',
-      payments: '++id, &key, invoiceNumber, date, method, updatedAt'
+      payments: '++id, key, invoiceNumber, date, method, updatedAt'
     })
     this.version(3).stores({
       company: 'id, name',
       clients: '++id, companyId, name, taxId, phone, email',
       products: '++id, companyId, name, price',
       invoices: '++id, companyId, number, status, date, client.name, updatedAt, publicShareId',
-      payments: '++id, &key, companyId, invoiceNumber, date, method, updatedAt'
+      payments: '++id, key, companyId, invoiceNumber, date, method, updatedAt'
     }).upgrade(async tx => {
       await tx.table('clients').toCollection().modify(row => { if (!row.companyId) row.companyId = 1 })
       await tx.table('products').toCollection().modify(row => { if (!row.companyId) row.companyId = 1 })
@@ -65,53 +74,59 @@ class InvoiceDB extends Dexie {
       await tx.table('payments').toCollection().modify(row => { if (!row.companyId) row.companyId = 1 })
     })
 
-    // v4 repairs every existing browser database before the unique index is introduced.
+    // v4 no elimina ni deduplica documentos. Solo normaliza campos de alcance.
     this.version(4).stores({
       company: 'id, name',
       clients: '++id, companyId, name, taxId, phone, email',
       products: '++id, companyId, name, price',
       invoices: '++id, companyId, logicalKey, number, status, date, client.name, updatedAt, publicShareId',
-      payments: '++id, &key, companyId, invoiceNumber, date, method, updatedAt'
+      payments: '++id, key, companyId, invoiceNumber, date, method, updatedAt'
     }).upgrade(async tx => {
-      const table = tx.table('invoices')
-      const rows = await table.toArray() as Invoice[]
-      const groups = new Map<string, Invoice[]>()
-
-      for (const row of rows) {
+      await tx.table('clients').toCollection().modify(row => { if (!row.companyId) row.companyId = 1 })
+      await tx.table('products').toCollection().modify(row => { if (!row.companyId) row.companyId = 1 })
+      await tx.table('invoices').toCollection().modify(row => {
         const companyId = Number(row.companyId) || 1
-        const logicalKey = invoiceLogicalKeyFor({ companyId, number: row.number || '' })
-        const group = groups.get(logicalKey) || []
-        group.push({ ...row, companyId, logicalKey })
-        groups.set(logicalKey, group)
-      }
-
-      const keep: Invoice[] = []
-      const removeIds: number[] = []
-      for (const group of groups.values()) {
-        const ordered = [...group].sort((a, b) => invoiceRecordTime(b) - invoiceRecordTime(a) || Number(a.id || 0) - Number(b.id || 0))
-        const winner = ordered[0]
-        if (winner) keep.push(winner)
-        for (const duplicate of ordered.slice(1)) if (typeof duplicate.id === 'number') removeIds.push(duplicate.id)
-      }
-
-      if (removeIds.length) await table.bulkDelete(removeIds)
-      if (keep.length) await table.bulkPut(keep)
+        row.companyId = companyId
+        row.logicalKey = invoiceLogicalKeyFor({ companyId, number: row.number || '' })
+      })
+      await tx.table('payments').toCollection().modify(row => { if (!row.companyId) row.companyId = 1 })
     })
 
-    // v5 makes duplication impossible for the same company + invoice number.
+    // v5 conserva todos los documentos aunque compartan número. No hay índice único en facturas.
     this.version(5).stores({
       company: 'id, name',
       clients: '++id, companyId, name, taxId, phone, email',
       products: '++id, companyId, name, price',
-      invoices: '++id, companyId, &logicalKey, number, status, date, client.name, updatedAt, publicShareId',
-      payments: '++id, &key, companyId, invoiceNumber, date, method, updatedAt'
+      invoices: '++id, companyId, logicalKey, number, status, date, client.name, updatedAt, publicShareId',
+      payments: '++id, key, companyId, invoiceNumber, date, method, updatedAt'
+    })
+
+    // v6 retira cualquier índice único previo y refuerza la política de no pérdida de datos.
+    this.version(6).stores({
+      company: 'id, name',
+      clients: '++id, companyId, name, taxId, phone, email',
+      products: '++id, companyId, name, price',
+      invoices: '++id, companyId, logicalKey, number, status, date, client.name, updatedAt, publicShareId',
+      payments: '++id, key, companyId, invoiceNumber, date, method, updatedAt'
+    }).upgrade(async tx => {
+      await tx.table('clients').toCollection().modify(row => { if (!row.companyId) row.companyId = 1 })
+      await tx.table('products').toCollection().modify(row => { if (!row.companyId) row.companyId = 1 })
+      await tx.table('invoices').toCollection().modify(row => {
+        const companyId = Number(row.companyId) || 1
+        row.companyId = companyId
+        row.logicalKey = invoiceLogicalKeyFor({ companyId, number: row.number || '' })
+      })
+      await tx.table('payments').toCollection().modify(row => {
+        if (!row.companyId) row.companyId = 1
+        if (!row.key) row.key = `${row.companyId}:${row.invoiceNumber || 'sin-factura'}:${row.date || row.createdAt || Date.now()}`
+      })
     })
   }
 }
 
 export const db = new InvoiceDB()
 
-// Keep the unique key synchronized for every future local write.
+// Keep the searchable key synchronized for every future local write.
 db.invoices.hook('creating', (_primaryKey, row) => {
   row.companyId = Number(row.companyId) || 1
   row.logicalKey = invoiceLogicalKeyFor(row)
@@ -172,17 +187,42 @@ export async function exportBackup(): Promise<BackupData> {
   }
 }
 
+async function putWithoutDestroying(table: Dexie.Table<any, any>, row: any) {
+  if (row?.id == null) {
+    await table.add(row)
+    return
+  }
+  const current = await table.get(row.id)
+  if (!current) {
+    await table.put(row)
+    return
+  }
+  // Never overwrite an existing local record during import. Keep both copies.
+  const copy = { ...row }
+  delete copy.id
+  await table.add(copy)
+}
+
 export async function importBackup(data: BackupData) {
   if (!data || ![1, 2, 3].includes(data.version) || !Array.isArray(data.invoices)) {
     throw new Error('El archivo de respaldo no es compatible.')
   }
   await db.transaction('rw', db.company, db.clients, db.products, db.invoices, db.payments, async () => {
-    await Promise.all([db.company.clear(), db.clients.clear(), db.products.clear(), db.invoices.clear(), db.payments.clear()])
-    if (data.company?.length) await db.company.bulkPut(data.company)
-    if (data.clients?.length) await db.clients.bulkPut(data.clients.map(row => ({ ...row, companyId: row.companyId || 1 })))
-    if (data.products?.length) await db.products.bulkPut(data.products.map(row => ({ ...row, companyId: row.companyId || 1 })))
-    if (data.invoices?.length) await db.invoices.bulkPut(canonicalizeInvoices(data.invoices))
-    if (data.payments?.length) await db.payments.bulkPut(data.payments.map(row => ({ ...row, companyId: row.companyId || 1 })))
+    if (data.company?.length) {
+      for (const row of data.company) await db.company.put({ ...defaultCompany, ...row, id: Number(row.id) || 1 })
+    }
+    if (data.clients?.length) {
+      for (const row of data.clients) await putWithoutDestroying(db.clients, normalizeClient(row))
+    }
+    if (data.products?.length) {
+      for (const row of data.products) await putWithoutDestroying(db.products, normalizeProduct(row))
+    }
+    if (data.invoices?.length) {
+      for (const row of data.invoices) await putWithoutDestroying(db.invoices, normalizeInvoice(row))
+    }
+    if (data.payments?.length) {
+      for (const row of data.payments) await putWithoutDestroying(db.payments, normalizePayment(row))
+    }
   })
   await ensureCompany()
 }
