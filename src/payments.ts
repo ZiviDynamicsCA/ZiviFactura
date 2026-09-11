@@ -1,5 +1,5 @@
 import { db } from './db'
-import { isVisiblePayment } from './dataIntegrity'
+import { isVisiblePayment, uniqueOperationalPayments } from './dataIntegrity'
 import { totals } from './pdf'
 import { getRateValue } from './rates'
 import type { Invoice, Payment, PaymentMethodKey, RateSnapshot } from './types'
@@ -56,7 +56,7 @@ export function paymentAmountVes(amountApplied: number, invoiceCurrency: string,
 }
 
 export function visiblePayments(payments: Payment[]) {
-  return payments.filter(isVisiblePayment)
+  return uniqueOperationalPayments(payments.filter(isVisiblePayment))
 }
 
 export function appliedForInvoice(invoiceNumber: string, payments: Payment[]) {
