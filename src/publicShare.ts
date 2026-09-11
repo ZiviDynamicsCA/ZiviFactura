@@ -105,26 +105,30 @@ export async function publishPublicDocument(invoice: Invoice, company: Company) 
   if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo por enlace.')
 
   const user = firebaseAuth?.currentUser || null
-  const id = invoice.publicShareId || shareId()
+  const id = invoice.publicShareId && !invoice.publicShareId.startsWith('local-') ? invoice.publicShareId : shareId()
   const payload = buildPublicPayload(invoice, company, user?.uid || 'local')
 
   if (firestore && user) {
-    await setDoc(doc(firestore, 'publicDocuments', id), { ...payload, updatedAt: serverTimestamp() }, { merge: true })
-    if (!invoice.publicShareId) {
-      await db.invoices.update(invoice.id, { publicShareId: id, updatedAt: new Date().toISOString() })
-    }
-    return {
-      id,
-      url: `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`,
-      total: payload.total,
+    try {
+      await setDoc(doc(firestore, 'publicDocuments', id), { ...payload, updatedAt: serverTimestamp() }, { merge: true })
+      if (!invoice.publicShareId || invoice.publicShareId.startsWith('local-')) {
+        await db.invoices.update(invoice.id, { publicShareId: id, updatedAt: new Date().toISOString() })
+      }
+      return {
+        id,
+        url: `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`,
+        total: payload.total,
+      }
+    } catch (error) {
+      console.warn('[ZiviFactura] No se pudo publicar en Firestore. Se usará enlace local.', error)
     }
   }
 
-  // Fallback seguro para modo local: permite compartir una página autocontenida
-  // sin requerir sesión Firebase. No habilita carga de voucher en la nube.
+  // Fallback seguro: permite compartir/ver la factura aunque Firebase no esté listo,
+  // no haya sesión activa o Firestore rechace temporalmente la escritura.
   return {
     id: `local-${id}`,
-    url: localDocumentUrl({ ...payload, publicShareId: id }),
+    url: localDocumentUrl({ ...payload, ownerUid: 'local', localOnly: true, publicShareId: id }),
     total: payload.total,
   }
 }
