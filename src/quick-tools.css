@@ -1,5 +1,9 @@
 body.quick-nav-active {
-  padding-bottom: 98px;
+  padding-bottom: 96px;
+}
+
+body.quick-nav-active.quick-editor-active {
+  padding-bottom: 18px;
 }
 
 .quick-nav-active .workspaceNav,
@@ -22,9 +26,17 @@ body.quick-nav-active {
   padding-bottom: 54px;
 }
 
+.quick-editor-active .page {
+  padding-bottom: 20px;
+}
+
 .quick-nav-active .toast {
   z-index: 140;
   bottom: calc(112px + env(safe-area-inset-bottom));
+}
+
+.quick-editor-active .toast {
+  bottom: calc(22px + env(safe-area-inset-bottom));
 }
 
 .quickBackdrop {
@@ -72,17 +84,22 @@ body.quick-nav-active {
   gap: 4px;
   font-weight: 760;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .quickDock button svg {
   width: 20px;
   height: 20px;
+  flex: none;
 }
 
 .quickDock button span {
+  max-width: 100%;
   font-size: .66rem;
   line-height: 1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .quickDock button.active {
@@ -125,15 +142,20 @@ body.quick-nav-active {
   left: 50%;
   bottom: calc(104px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  width: min(920px, calc(100vw - 20px));
-  max-height: min(68vh, 620px);
+  width: min(880px, calc(100vw - 20px));
+  max-height: min(66vh, 600px);
   overflow: auto;
   overscroll-behavior: contain;
   border: 1px solid rgba(211, 220, 233, .96);
-  border-radius: 26px;
+  border-radius: 24px;
   background: #fff;
   box-shadow: 0 28px 80px rgba(5, 18, 44, .28);
-  padding: 12px 18px 20px;
+  padding: 12px 16px 18px;
+}
+
+.quick-editor-active .quickCalculatorSheet,
+.quick-editor-active .quickMoreSheet {
+  bottom: calc(16px + env(safe-area-inset-bottom));
 }
 
 .quickSheetHandle {
@@ -141,7 +163,7 @@ body.quick-nav-active {
   height: 5px;
   border-radius: 99px;
   background: #d8e0eb;
-  margin: 0 auto 12px;
+  margin: 0 auto 10px;
 }
 
 .quickSheetHead,
@@ -152,16 +174,21 @@ body.quick-nav-active {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 12px;
   padding-top: 4px;
   padding-bottom: 10px;
   background: #fff;
 }
 
+.quickSheetHead > div,
+.quickMoreSheet header > div {
+  min-width: 0;
+}
+
 .quickSheetHead > div > span,
 .quickMoreSheet header > div > span {
-  font-size: .66rem;
+  font-size: .64rem;
   font-weight: 900;
   letter-spacing: .14em;
   color: #2563eb;
@@ -169,22 +196,22 @@ body.quick-nav-active {
 
 .quickSheetHead h2,
 .quickMoreSheet h2 {
-  margin: 3px 0 5px;
-  font-size: 1.34rem;
+  margin: 2px 0 4px;
+  font-size: 1.22rem;
   letter-spacing: -.025em;
   color: #102039;
 }
 
 .quickSheetHead p {
   margin: 0;
-  font-size: .8rem;
+  font-size: .78rem;
   color: #66748a;
 }
 
 .quickSheetHead > button,
 .quickMoreSheet header > button {
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 14px;
   background: #f1f5fb;
@@ -197,22 +224,22 @@ body.quick-nav-active {
 
 .quickCalcWorkspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, .8fr);
+  gap: 12px;
 }
 
 .quickCalcMain,
 .quickRates {
   border: 1px solid #e4eaf3;
-  border-radius: 19px;
+  border-radius: 18px;
   background: #fbfdff;
-  padding: 14px;
+  padding: 12px;
   min-width: 0;
 }
 
 .quickExpression {
   display: grid;
-  gap: 6px;
+  gap: 5px;
 }
 
 .quickExpression span,
@@ -224,36 +251,36 @@ body.quick-nav-active {
 
 .quickExpression input {
   width: 100%;
-  height: 52px;
+  height: 48px;
   border: 1px solid #dbe3ef;
   border-radius: 13px;
   background: #fff;
-  padding: 0 13px;
-  font-size: 1.08rem;
+  padding: 0 12px;
+  font-size: 1rem;
   font-weight: 730;
   color: #17233b;
 }
 
 .quickResult {
-  margin-top: 10px;
-  border-radius: 15px;
+  margin-top: 8px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #0d1b35, #173b8f);
   color: #fff;
-  padding: 13px;
+  padding: 11px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px 10px;
+  gap: 4px 8px;
   align-items: center;
 }
 
 .quickResult > span {
-  font-size: .69rem;
+  font-size: .68rem;
   color: #a9bddc;
 }
 
 .quickResult > strong {
   grid-column: 1;
-  font-size: 1.42rem;
+  font-size: 1.22rem;
   letter-spacing: -.035em;
   overflow-wrap: anywhere;
 }
@@ -261,15 +288,15 @@ body.quick-nav-active {
 .quickResult > button {
   grid-column: 2;
   grid-row: 1 / 3;
-  min-height: 38px;
+  min-height: 36px;
   border: 1px solid rgba(255, 255, 255, .14);
   border-radius: 10px;
   background: rgba(255, 255, 255, .08);
   color: #fff;
-  padding: 0 10px;
+  padding: 0 9px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-weight: 780;
   cursor: pointer;
 }
@@ -282,16 +309,16 @@ body.quick-nav-active {
 
 .quickResultMeta {
   grid-column: 1 / -1;
-  font-size: .72rem;
+  font-size: .69rem;
   color: #cfe3ff;
 }
 
 .quickSourceResult {
-  margin-top: 8px;
+  margin-top: 7px;
   border: 1px dashed #c9d7eb;
-  border-radius: 13px;
+  border-radius: 12px;
   background: #fff;
-  padding: 9px 11px;
+  padding: 8px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -299,13 +326,13 @@ body.quick-nav-active {
 }
 
 .quickSourceResult span {
-  font-size: .71rem;
+  font-size: .69rem;
   color: #6c7a90;
 }
 
 .quickSourceResult strong {
   color: #12213a;
-  font-size: .9rem;
+  font-size: .86rem;
   white-space: nowrap;
 }
 
@@ -313,8 +340,8 @@ body.quick-nav-active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin: 12px 0;
+  gap: 8px;
+  margin: 10px 0;
 }
 
 .quickCurrencyRow > div {
@@ -325,13 +352,13 @@ body.quick-nav-active {
 }
 
 .quickCurrencyRow button {
-  height: 30px;
+  height: 28px;
   border: 1px solid #dfe6f1;
   border-radius: 9px;
   background: #fff;
   color: #637188;
-  padding: 0 9px;
-  font-size: .71rem;
+  padding: 0 8px;
+  font-size: .7rem;
   font-weight: 820;
   cursor: pointer;
 }
@@ -344,14 +371,14 @@ body.quick-nav-active {
 
 .quickKeypad {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
 }
 
 .quickKeypad button {
-  height: 42px;
+  height: 36px;
   border: 1px solid #e0e7f1;
-  border-radius: 11px;
+  border-radius: 10px;
   background: #fff;
   color: #293851;
   font-weight: 820;
@@ -366,8 +393,8 @@ body.quick-nav-active {
 
 .quickApply {
   width: 100%;
-  min-height: 46px;
-  margin-top: 10px;
+  min-height: 42px;
+  margin-top: 8px;
   border: 0;
   border-radius: 12px;
   background: linear-gradient(135deg, #2563eb, #0ea5e9);
@@ -383,7 +410,7 @@ body.quick-nav-active {
 .quickRates {
   display: grid;
   align-content: start;
-  gap: 11px;
+  gap: 9px;
 }
 
 .quickRatesHead {
@@ -396,7 +423,7 @@ body.quick-nav-active {
 .quickRatesHead span,
 .quickEquivalentBlock > span {
   display: block;
-  font-size: .63rem;
+  font-size: .62rem;
   font-weight: 880;
   letter-spacing: .12em;
   color: #73829a;
@@ -409,8 +436,8 @@ body.quick-nav-active {
 }
 
 .quickRatesHead > button {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border: 1px solid #e0e7f0;
   border-radius: 10px;
   background: #fff;
@@ -428,15 +455,15 @@ body.quick-nav-active {
 
 .quickRateList > button,
 .quickEquivalentBlock > button {
-  min-height: 43px;
+  min-height: 40px;
   border: 1px solid #e3e9f2;
   border-radius: 11px;
   background: #fff;
-  padding: 7px 9px;
+  padding: 6px 8px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   text-align: left;
   color: #21314e;
   cursor: pointer;
@@ -444,13 +471,13 @@ body.quick-nav-active {
 
 .quickRateList > button span,
 .quickEquivalentBlock > button span {
-  font-size: .71rem;
+  font-size: .7rem;
   color: #69788f;
 }
 
 .quickRateList > button strong,
 .quickEquivalentBlock > button strong {
-  font-size: .82rem;
+  font-size: .8rem;
   text-align: right;
 }
 
@@ -462,7 +489,7 @@ body.quick-nav-active {
 
 .quickEquivalentBlock {
   border-top: 1px solid #e5ebf3;
-  padding-top: 10px;
+  padding-top: 9px;
 }
 
 .quickMoreSheet {
@@ -477,23 +504,23 @@ body.quick-nav-active {
 }
 
 .quickMoreGrid > button {
-  min-height: 78px;
+  min-height: 74px;
   border: 1px solid #e1e8f2;
   border-radius: 15px;
   background: #fbfdff;
   color: #1e2d49;
-  padding: 12px;
+  padding: 11px;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   text-align: left;
   cursor: pointer;
 }
 
 .quickMoreGrid > button > svg {
-  width: 38px;
-  height: 38px;
-  padding: 9px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
   border-radius: 12px;
   background: #edf4ff;
   color: #2563eb;
@@ -506,13 +533,13 @@ body.quick-nav-active {
 }
 
 .quickMoreGrid strong {
-  font-size: .84rem;
+  font-size: .82rem;
 }
 
 .quickMoreGrid small {
   margin-top: 3px;
   color: #748198;
-  font-size: .69rem;
+  font-size: .68rem;
   line-height: 1.35;
 }
 
@@ -568,7 +595,11 @@ body.quick-nav-active {
 
 @media (max-width: 760px) {
   body.quick-nav-active {
-    padding-bottom: 88px;
+    padding-bottom: 82px;
+  }
+
+  body.quick-nav-active.quick-editor-active {
+    padding-bottom: 10px;
   }
 
   .quick-nav-active .top {
@@ -576,25 +607,18 @@ body.quick-nav-active {
     padding: 8px 13px;
   }
 
-  .quick-nav-active .page {
-    padding-bottom: 40px;
-  }
-
-  .quick-nav-active .toast {
-    bottom: calc(100px + env(safe-area-inset-bottom));
-  }
-
   .quickDock {
     bottom: 7px;
     width: calc(100vw - 12px);
-    min-height: 72px;
+    min-height: 66px;
     border-radius: 20px;
-    padding: 5px 5px calc(5px + env(safe-area-inset-bottom));
+    padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
     gap: 1px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .quickDock button {
-    min-height: 54px;
+    min-height: 52px;
     padding: 4px 1px;
     border-radius: 13px;
   }
@@ -605,31 +629,36 @@ body.quick-nav-active {
   }
 
   .quickDock button span {
-    font-size: .56rem;
+    font-size: .53rem;
     letter-spacing: -.02em;
   }
 
   .quickDock .quickDockCreate {
-    min-height: 62px;
-    margin-top: -12px;
-    border-radius: 18px;
+    min-height: 58px;
+    margin-top: -10px;
   }
 
   .quickDock .quickDockCreate svg {
-    width: 23px;
-    height: 23px;
+    width: 22px;
+    height: 22px;
   }
 
   .quickCalculatorSheet,
   .quickMoreSheet {
     left: 8px;
     right: 8px;
-    bottom: calc(84px + env(safe-area-inset-bottom));
+    bottom: calc(78px + env(safe-area-inset-bottom));
     transform: none;
     width: auto;
-    max-height: min(60vh, 540px);
-    border-radius: 19px;
+    max-height: min(58vh, 520px);
+    border-radius: 18px;
     padding: 8px 10px 12px;
+  }
+
+  .quick-editor-active .quickCalculatorSheet,
+  .quick-editor-active .quickMoreSheet {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    max-height: min(62vh, 520px);
   }
 
   .quickSheetHandle {
@@ -643,7 +672,7 @@ body.quick-nav-active {
     top: -8px;
     gap: 8px;
     margin-bottom: 8px;
-    padding-bottom: 7px;
+    padding-bottom: 8px;
   }
 
   .quickSheetHead h2,
@@ -656,6 +685,12 @@ body.quick-nav-active {
     display: none;
   }
 
+  .quickSheetHead > button,
+  .quickMoreSheet header > button {
+    width: 42px;
+    height: 42px;
+  }
+
   .quickCalcWorkspace {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -663,7 +698,7 @@ body.quick-nav-active {
 
   .quickCalcMain,
   .quickRates {
-    padding: 10px;
+    padding: 9px;
     border-radius: 15px;
   }
 
@@ -679,7 +714,7 @@ body.quick-nav-active {
   }
 
   .quickResult > strong {
-    font-size: 1.05rem;
+    font-size: 1.02rem;
   }
 
   .quickResult > button {
@@ -689,7 +724,7 @@ body.quick-nav-active {
   }
 
   .quickSourceResult {
-    padding: 7px 9px;
+    padding: 7px 8px;
   }
 
   .quickCurrencyRow {
@@ -714,15 +749,15 @@ body.quick-nav-active {
   }
 
   .quickKeypad button {
-    height: 34px;
+    height: 33px;
     border-radius: 9px;
-    font-size: .86rem;
+    font-size: .84rem;
   }
 
   .quickApply {
-    min-height: 40px;
+    min-height: 39px;
     margin-top: 8px;
-    font-size: .82rem;
+    font-size: .8rem;
   }
 
   .quickRatesHead {
@@ -739,13 +774,13 @@ body.quick-nav-active {
   }
 
   .quickEquivalentBlock > button {
-    min-height: 36px;
+    min-height: 35px;
     padding: 6px 8px;
   }
 
   .quickEquivalentBlock > button span,
   .quickEquivalentBlock > button strong {
-    font-size: .72rem;
+    font-size: .71rem;
   }
 
   .quickMoreGrid {
@@ -753,40 +788,34 @@ body.quick-nav-active {
   }
 
   .quickMoreGrid > button {
-    min-height: 68px;
+    min-height: 64px;
   }
 }
 
 @media (max-width: 390px) {
   .quickDock button span {
-    font-size: .52rem;
-  }
-
-  .quickDock button svg {
-    width: 17px;
-    height: 17px;
-  }
-
-  .quickDock .quickDockCreate svg {
-    width: 22px;
-    height: 22px;
+    font-size: .49rem;
   }
 
   .quickCalculatorSheet,
   .quickMoreSheet {
     left: 6px;
     right: 6px;
-    bottom: calc(80px + env(safe-area-inset-bottom));
-    max-height: min(58vh, 510px);
+    max-height: min(56vh, 500px);
     padding: 7px 8px 10px;
   }
 
+  .quick-editor-active .quickCalculatorSheet,
+  .quick-editor-active .quickMoreSheet {
+    max-height: min(60vh, 500px);
+  }
+
   .quickKeypad button {
-    height: 31px;
-    font-size: .8rem;
+    height: 30px;
+    font-size: .78rem;
   }
 
   .quickResult > strong {
-    font-size: .98rem;
+    font-size: .96rem;
   }
 }
