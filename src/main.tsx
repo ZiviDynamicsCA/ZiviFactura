@@ -10,7 +10,7 @@ import QuickTools from './QuickTools'
 import ZiviChrome from './ZiviChrome'
 import { initAutomaticBackup } from './cloudBackup'
 import { dedupeStoredClients, startClientDedupWatcher } from './clientDedup'
-import { restoreArchivedTechnicalRecords } from './dataIntegrity'
+import { installOperationalReadGuards } from './operationalReadGuards'
 import './styles.css'
 import './payments.css'
 import './proofs.css'
@@ -35,7 +35,9 @@ type PwaWindow = Window & {
 }
 
 const pwaWindow = window as PwaWindow
-const PWA_RESET_KEY = 'zivifactura.pwa-reset-v40'
+const PWA_RESET_KEY = 'zivifactura.pwa-reset-v41'
+
+installOperationalReadGuards()
 
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault()
@@ -117,12 +119,6 @@ if (document.readyState === 'complete') void registerPwaServiceWorker()
 else window.addEventListener('load', () => void registerPwaServiceWorker(), { once: true })
 
 async function bootstrap() {
-  await restoreArchivedTechnicalRecords()
-    .then(result => {
-      if (result.invoices || result.payments) console.info(`[ZiviFactura] Restaurados ${result.invoices} documento(s) y ${result.payments} movimiento(s) archivados técnicamente.`)
-    })
-    .catch(error => console.warn('[ZiviFactura] technical archive restore:', error))
-
   await dedupeStoredClients().catch(error => console.warn('[ZiviFactura] client cleanup:', error))
   startClientDedupWatcher()
   initAutomaticBackup()
