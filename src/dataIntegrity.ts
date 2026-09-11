@@ -1,4 +1,3 @@
-import { db } from './db'
 import { totals } from './pdf'
 import type { Invoice, Payment } from './types'
 
@@ -35,22 +34,51 @@ function moneyKey(value: unknown) {
 }
 
 function visibleCompanyId(row: { companyId?: number; originalCompanyId?: number }) {
-  return Number(row.originalCompanyId || row.companyId) || 1
+  return Math.abs(Number(row.originalCompanyId || row.companyId) || 1)
+}
+
+function recordTime(row: { updatedAt?: string; createdAt?: string }) {
+  return Date.parse(row.updatedAt || row.createdAt || '') || 0
+}
+
+function invoiceStatusScore(status: Invoice['status']) {
+  if (status === 'paid') return 400
+  if (status === 'issued') return 300
+  if (status === 'draft') return 200
+  if (status === 'cancelled') return 100
+  return 0
+}
+
+function invoiceCanonicalScore(invoice: Invoice) {
+  let score = recordTime(invoice)
+  score += invoiceStatusScore(invoice.status)
+  if (invoice.publicShareId && !invoice.publicShareId.startsWith('local-')) score += 10_000
+  if (invoice.syncId) score += 5_000
+  if (!invoice.technicalDuplicateOf && (Number(invoice.companyId) || 1) > 0) score += 2_500
+  return score
+}
+
+function paymentCanonicalScore(payment: Payment) {
+  let score = recordTime(payment)
+  if (payment.proofSubmissionId) score += 10_000
+  if (payment.syncId) score += 5_000
+  if (payment.key) score += 2_500
+  if (!payment.technicalDuplicateOf && (Number(payment.companyId) || 1) > 0) score += 1_000
+  return score
 }
 
 export function invoiceTechnicalSignature(invoice: Invoice) {
   const total = totals(invoice).total
   return JSON.stringify({
     companyId: visibleCompanyId(invoice),
-    number: normalizeText(invoice.number),
-    type: invoice.type,
-    status: invoice.status,
+    number: normalizeCode(invoice.number),
+    type: invoice.type || 'Factura',
     date: invoice.date || '',
     dueDate: invoice.dueDate || '',
-    currency: invoice.currency || 'USD',
+    currency: normalizeCode(invoice.currency || 'USD').toUpperCase(),
     client: {
       name: normalizeText(invoice.client?.name),
-      taxId: normalizeText(invoice.client?.taxId),
+      taxId: normalizeCode(invoice.client?.taxId),
       phone: normalizeText(invoice.client?.phone).replace(/\D/g, ''),
       email: normalizeText(invoice.client?.email),
       address: normalizeText(invoice.client?.address),
@@ -64,7 +92,6 @@ export function invoiceTechnicalSignature(invoice: Invoice) {
     taxRate: moneyKey(invoice.taxRate),
     total: moneyKey(total),
     paymentMethod: normalizeText(invoice.paymentMethod),
-    notes: normalizeText(invoice.notes),
     rateSource: invoice.rateSource || 'none',
     rateValue: moneyKey(invoice.rateValue),
   })
@@ -86,81 +113,57 @@ export function paymentTechnicalSignature(payment: Payment) {
   })
 }
 
+function uniqueBySignature<T>(rows: T[], signatureFor: (row: T) => string, scoreFor: (row: T) => number) {
+  const selected = new Map<string, T>()
+  for (const row of rows) {
+    const signature = signatureFor(row)
+    const current = selected.get(signature)
+    if (!current || scoreFor(row) >= scoreFor(current)) selected.set(signature, row)
+  }
+  const winners = new Set(selected.values())
+  return rows.filter(row => winners.has(row))
+}
+
 function groupedCount<T>(rows: T[], signature: (row: T) => string) {
   const groups = new Map<string, number>()
-  for (const row of rows) groups.set(signature(row), (groups.get(signature(row)) || 0) + 1)
+  for (const row of rows) {
+    const key = signature(row)
+    groups.set(key, (groups.get(key) || 0) + 1)
+  }
   return Array.from(groups.values()).filter(count => count > 1).length
 }
 
-export function isVisiblePayment(payment: Payment) {
-  return (Number(payment.companyId) || 1) > 0 && !payment.technicalDuplicateOf
+export function isOperationalInvoice(invoice: Invoice) {
+  return (Number(invoice.companyId) || 1) > 0 && Boolean(invoice.number?.trim())
 }
 
+export function isVisiblePayment(payment: Payment) {
+  return (Number(payment.companyId) || 1) > 0 && Boolean(payment.invoiceNumber?.trim())
+}
+
+export function uniqueOperationalInvoices(invoices: Invoice[]) {
+  return uniqueBySignature(invoices.filter(isOperationalInvoice), invoiceTechnicalSignature, invoiceCanonicalScore)
+}
+
+export function uniqueOperationalPayments(payments: Payment[]) {
+  return uniqueBySignature(payments.filter(isVisiblePayment), paymentTechnicalSignature, paymentCanonicalScore)
+}
+
+// La restauración automática queda neutralizada. No debe mover registros,
+// cambiar companyId ni limpiar marcas técnicas sin una acción explícita del usuario.
 export async function restoreArchivedTechnicalRecords(): Promise<RestoreArchivedResult> {
-  const [invoices, payments] = await Promise.all([db.invoices.toArray(), db.payments.toArray()])
-  const archivedInvoices = invoices.filter(invoice => Number(invoice.companyId) < 0 || Boolean(invoice.technicalDuplicateOf))
-  const archivedPayments = payments.filter(payment => Number(payment.companyId) < 0 || Boolean(payment.technicalDuplicateOf))
-  let restoredInvoices = 0
-  let restoredPayments = 0
-  const now = new Date().toISOString()
-
-  await db.transaction('rw', db.invoices, db.payments, async () => {
-    for (const invoice of archivedInvoices) {
-      if (!invoice.id) continue
-      const restoredCompanyId = Math.abs(Number(invoice.originalCompanyId || invoice.companyId || 1)) || 1
-      await db.invoices.update(invoice.id, {
-        companyId: restoredCompanyId,
-        originalCompanyId: undefined,
-        technicalDuplicateOf: undefined,
-        technicalDuplicateHiddenAt: undefined,
-        technicalDuplicateSignature: undefined,
-        updatedAt: now,
-      } as Partial<Invoice>)
-      restoredInvoices += 1
-    }
-
-    for (const payment of archivedPayments) {
-      if (!payment.id) continue
-      const restoredCompanyId = Math.abs(Number(payment.originalCompanyId || payment.companyId || 1)) || 1
-      await db.payments.update(payment.id, {
-        companyId: restoredCompanyId,
-        originalCompanyId: undefined,
-        technicalDuplicateOf: undefined,
-        technicalDuplicateHiddenAt: undefined,
-        technicalDuplicateSignature: undefined,
-        updatedAt: now,
-      } as Partial<Payment>)
-      restoredPayments += 1
-    }
-  })
-
-  if (restoredInvoices || restoredPayments) {
-    window.dispatchEvent(new CustomEvent('zivifactura:integrity-restored', {
-      detail: { restoredInvoices, restoredPayments },
-    }))
-  }
-
-  return { invoices: restoredInvoices, payments: restoredPayments }
+  return { invoices: 0, payments: 0 }
 }
 
 // Política de seguridad:
-// Estas funciones ya NO ocultan ni mueven registros automáticamente.
-// Solo analizan cuántos grupos duplicados existirían. Cualquier consolidación
-// deberá hacerse luego desde una pantalla manual con confirmación del usuario.
-export async function repairExactInvoiceDuplicates(): Promise<InvoiceDuplicateRepairResult> {
-  const invoices = await db.invoices.toArray()
-  const active = invoices.filter(invoice => {
-    const companyId = Number(invoice.companyId) || 1
-    return companyId > 0 && Boolean(invoice.number?.trim())
-  })
+// Estas funciones NO ocultan, NO mueven y NO borran registros. Solo informan
+// cuántos grupos duplicados existen para una futura pantalla manual de integridad.
+export async function repairExactInvoiceDuplicates(invoices: Invoice[] = []): Promise<InvoiceDuplicateRepairResult> {
+  const active = invoices.filter(isOperationalInvoice)
   return { scanned: invoices.length, groups: groupedCount(active, invoiceTechnicalSignature), hidden: 0 }
 }
 
-export async function repairExactPaymentDuplicates(): Promise<PaymentDuplicateRepairResult> {
-  const payments = await db.payments.toArray()
-  const active = payments.filter(payment => {
-    const companyId = Number(payment.companyId) || 1
-    return companyId > 0 && Boolean(payment.invoiceNumber?.trim())
-  })
+export async function repairExactPaymentDuplicates(payments: Payment[] = []): Promise<PaymentDuplicateRepairResult> {
+  const active = payments.filter(isVisiblePayment)
   return { scanned: payments.length, groups: groupedCount(active, paymentTechnicalSignature), hidden: 0 }
 }
