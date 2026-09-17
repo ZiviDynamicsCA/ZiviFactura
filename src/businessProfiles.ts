@@ -6,6 +6,7 @@ export type BusinessModuleKey =
   | 'payments'
   | 'income'
   | 'rates'
+  | 'catalog'
   | 'education_enrollment'
   | 'students'
   | 'tuition'
@@ -32,9 +33,9 @@ export const BUSINESS_PROFILES: BusinessProfilePreset[] = [
     title: 'Servicios, NFC y proyectos',
     shortTitle: 'Servicios / NFC',
     description: 'Para Zivi Dynamics, profesionales, consultores, técnicos y negocios que venden servicios, paquetes o productos personalizados.',
-    bestFor: 'Cotizaciones, facturas, cobros, enlaces de pago, tasas BCV/USDT y seguimiento de clientes.',
-    modules: ['billing', 'receivables', 'payments', 'income', 'rates'],
-    nextPhase: ['Catálogo de servicios', 'Notas de entrega', 'Seguimiento por proyecto'],
+    bestFor: 'Cotizaciones, facturas, catálogo, notas de entrega, cobros, tasas BCV/USDT y seguimiento de clientes.',
+    modules: ['billing', 'receivables', 'payments', 'income', 'rates', 'catalog', 'delivery_notes'],
+    nextPhase: ['Seguimiento por proyecto', 'Órdenes de trabajo', 'Rentabilidad por proyecto'],
   },
   {
     key: 'education',
@@ -50,8 +51,8 @@ export const BUSINESS_PROFILES: BusinessProfilePreset[] = [
     title: 'Comercio general',
     shortTitle: 'Comercio',
     description: 'Para tiendas y comercios con ventas frecuentes, control de compras, proveedores, caja, cuentas por cobrar y por pagar.',
-    bestFor: 'Facturación, inventario, compras, pagos a proveedores, ventas y caja diaria.',
-    modules: ['billing', 'receivables', 'payments', 'income', 'rates', 'inventory', 'purchases', 'suppliers', 'delivery_notes'],
+    bestFor: 'Facturación, catálogo, inventario, compras, pagos a proveedores, ventas y caja diaria.',
+    modules: ['billing', 'receivables', 'payments', 'income', 'rates', 'catalog', 'inventory', 'purchases', 'suppliers', 'delivery_notes'],
     nextPhase: ['Inventario', 'Compras', 'Cuentas por pagar'],
   },
   {
@@ -59,8 +60,8 @@ export const BUSINESS_PROFILES: BusinessProfilePreset[] = [
     title: 'Floristería / pedidos',
     shortTitle: 'Floristería',
     description: 'Para floristerías que trabajan con pedidos, arreglos, entregas, abonos, proveedores y control de inventario sensible.',
-    bestFor: 'Pedidos con fecha de entrega, notas de entrega, abonos, proveedores e inventario de flores/materiales.',
-    modules: ['billing', 'receivables', 'payments', 'income', 'rates', 'inventory', 'purchases', 'suppliers', 'delivery_notes', 'orders'],
+    bestFor: 'Catálogo, pedidos con fecha de entrega, notas de entrega, abonos, proveedores e inventario de flores/materiales.',
+    modules: ['billing', 'receivables', 'payments', 'income', 'rates', 'catalog', 'inventory', 'purchases', 'suppliers', 'delivery_notes', 'orders'],
     nextPhase: ['Pedidos por fecha', 'Rutas de entrega', 'Inventario de flores y materiales'],
   },
 ]
