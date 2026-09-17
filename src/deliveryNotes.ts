@@ -38,8 +38,8 @@ function ownerScope() {
   return firebaseAuth?.currentUser?.uid || 'local'
 }
 
-function storageKey(companyId: number) {
-  return `zivifactura.deliveryNotes.${ownerScope()}.${companyId}`
+function storageKey(companyId: number, scope = ownerScope()) {
+  return `zivifactura.deliveryNotes.${scope}.${companyId}`
 }
 
 function timestamp(note: DeliveryNote) {
@@ -55,12 +55,15 @@ function uniqueNewest(rows: DeliveryNote[]) {
   return [...map.values()].sort((a, b) => timestamp(b) - timestamp(a))
 }
 
+function parseStored(key: string) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]') as DeliveryNote[] } catch { return [] }
+}
+
 export function readLocalDeliveryNotes(companyId: number) {
-  try {
-    return uniqueNewest(JSON.parse(localStorage.getItem(storageKey(companyId)) || '[]') as DeliveryNote[])
-  } catch {
-    return []
-  }
+  const scope = ownerScope()
+  const scoped = parseStored(storageKey(companyId, scope))
+  const localFallback = scope === 'local' ? [] : parseStored(storageKey(companyId, 'local'))
+  return uniqueNewest([...scoped, ...localFallback])
 }
 
 function writeLocalDeliveryNotes(companyId: number, rows: DeliveryNote[]) {
@@ -105,6 +108,12 @@ export async function loadDeliveryNotes(companyId: number) {
       .filter(item => Number(item.companyId) === companyId && Boolean(item.syncId))
     const merged = uniqueNewest([...local, ...remote])
     writeLocalDeliveryNotes(companyId, merged)
+
+    // Reenvía la vista reconciliada para que las notas creadas o archivadas
+    // sin conexión terminen llegando a Firestore al recuperar internet.
+    void Promise.all(merged.map(note => setDoc(doc(firestore, 'users', user.uid, 'deliveryNotes', note.syncId), note, { merge: true })))
+      .catch(error => console.warn('[ZiviFactura] delivery notes reconcile:', error))
+
     return merged
   } catch (error) {
     console.warn('[ZiviFactura] delivery notes pull:', error)
