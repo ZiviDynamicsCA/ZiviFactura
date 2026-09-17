@@ -88,6 +88,21 @@ export default function DeliveryNotesView() {
     }
   }
 
+  async function markDelivered(note: DeliveryNote) {
+    if (!note.clientName.trim() || !note.items.some(item => item.description.trim() && Number(item.quantity) > 0)) {
+      setEditing(structuredClone(note))
+      return setMessage('Completa cliente y conceptos antes de marcar la nota como entregada.')
+    }
+    setBusy(true)
+    try {
+      const saved = await saveDeliveryNote({ ...note, status: 'delivered' })
+      setMessage(`${saved.number} marcada como entregada.`)
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function remove(note: DeliveryNote) {
     if (!confirm(`¿Archivar ${note.number}? La nota dejará de mostrarse, pero conservará su registro de sincronización.`)) return
     await archiveDeliveryNote(note)
@@ -137,7 +152,7 @@ export default function DeliveryNotesView() {
       {filtered.length ? <div className="deliveryList">{filtered.map(note => <article key={note.syncId}>
         <div className="deliveryMain"><span>{note.number} · {note.date}</span><strong>{note.clientName}</strong><small>{note.items.length} concepto(s){note.reference ? ` · ${note.reference}` : ''}{note.relatedInvoiceNumber ? ` · ${note.relatedInvoiceNumber}` : ''}</small></div>
         <span className={`deliveryStatus ${note.status}`}>{note.status === 'delivered' ? 'Entregada' : note.status === 'cancelled' ? 'Anulada' : 'Borrador'}</span>
-        <div className="deliveryActions"><button onClick={() => setEditing(structuredClone(note))}><Pencil size={15}/>Editar</button><button onClick={() => download(note)}><FileDown size={15}/>PDF</button>{note.status === 'draft' && <button className="success" onClick={() => { setEditing(structuredClone(note)); window.setTimeout(() => void persist('delivered'), 0) }}><CheckCircle2 size={15}/>Entregada</button>}<button className="danger" onClick={() => void remove(note)}><Trash2 size={15}/></button></div>
+        <div className="deliveryActions"><button onClick={() => setEditing(structuredClone(note))}><Pencil size={15}/>Editar</button><button onClick={() => download(note)}><FileDown size={15}/>PDF</button>{note.status === 'draft' && <button className="success" disabled={busy} onClick={() => void markDelivered(note)}><CheckCircle2 size={15}/>Entregada</button>}<button className="danger" onClick={() => void remove(note)}><Trash2 size={15}/></button></div>
       </article>)}</div> : <div className="moduleEmpty">Todavía no hay notas de entrega en este negocio.</div>}
       {message && <div className="moduleMessage">{message}</div>}
     </section>
