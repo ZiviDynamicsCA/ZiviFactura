@@ -1,15 +1,15 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import AuthShell from './AuthShell'
-import BusinessProfileModule from './BusinessProfileModule'
+import AuthShellV2 from './AuthShellV2'
 import EducationModule from './EducationModule'
 import HelpCenter from './HelpCenter'
 import InstallPrompt from './InstallPrompt'
-import ModuleBridge from './ModuleBridge'
 import QuickTools from './QuickTools'
 import ZiviChrome from './ZiviChrome'
+import { modulesForProfile, type BusinessProfileKey } from './businessProfiles'
 import { initAutomaticBackup } from './cloudBackup'
 import { dedupeStoredClients, startClientDedupWatcher } from './clientDedup'
+import { db, ensureCompany } from './db'
 import { installOperationalReadGuards } from './operationalReadGuards'
 import './styles.css'
 import './payments.css'
@@ -118,18 +118,30 @@ async function registerPwaServiceWorker() {
 if (document.readyState === 'complete') void registerPwaServiceWorker()
 else window.addEventListener('load', () => void registerPwaServiceWorker(), { once: true })
 
+async function upgradeBusinessProfileModules() {
+  await ensureCompany()
+  const companies = await db.company.toArray()
+  for (const company of companies) {
+    const profile = (company.businessProfile || 'services') as BusinessProfileKey
+    const merged = [...new Set([...modulesForProfile(profile), ...(company.enabledModules || [])])]
+    const current = company.enabledModules || []
+    if (merged.length !== current.length || merged.some(module => !current.includes(module))) {
+      await db.company.update(company.id, { enabledModules: merged, businessProfile: profile })
+    }
+  }
+}
+
 async function bootstrap() {
   await dedupeStoredClients().catch(error => console.warn('[ZiviFactura] client cleanup:', error))
+  await upgradeBusinessProfileModules().catch(error => console.warn('[ZiviFactura] business profile migration:', error))
   startClientDedupWatcher()
   initAutomaticBackup()
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <AuthShell />
+      <AuthShellV2 />
       <ZiviChrome />
       <QuickTools />
-      <ModuleBridge />
-      <BusinessProfileModule />
       <EducationModule />
       <HelpCenter />
       <InstallPrompt />
