@@ -104,10 +104,10 @@ export default function CatalogView() {
     await load()
   }
 
-  async function remove(row: Product) {
-    if (!row.id || !confirm(`¿Eliminar “${row.name}” del catálogo?`)) return
-    await db.products.delete(row.id)
-    setMessage('Elemento eliminado del catálogo.')
+  async function archive(row: Product) {
+    if (!row.id || !confirm(`¿Archivar “${row.name}”? Permanecerá en el historial, pero dejará de estar disponible para nuevas operaciones.`)) return
+    await db.products.update(row.id, { active: false, updatedAt: new Date().toISOString() })
+    setMessage('Elemento archivado. La sincronización conservará este estado en todos los dispositivos.')
     await load()
   }
 
@@ -136,7 +136,7 @@ export default function CatalogView() {
         <h3>{row.name}</h3>
         <p>{row.description || 'Sin descripción adicional.'}</p>
         <div className="catalogMeta"><strong>{money(Number(row.price) || 0, currency)}</strong><span>{row.sku || 'Sin código'} · {row.unit || 'und'}</span></div>
-        <div className="catalogActions"><button onClick={() => edit(row)}><Pencil size={15}/>Editar</button><button onClick={() => void toggle(row)}>{row.active === false ? 'Activar' : 'Pausar'}</button><button className="danger" onClick={() => void remove(row)}><Trash2 size={15}/></button></div>
+        <div className="catalogActions"><button onClick={() => edit(row)}><Pencil size={15}/>Editar</button><button onClick={() => void toggle(row)}>{row.active === false ? 'Activar' : 'Pausar'}</button>{row.active !== false && <button className="danger" title="Archivar" onClick={() => void archive(row)}><Trash2 size={15}/></button>}</div>
       </article>)}</div> : <div className="moduleEmpty">No hay elementos que coincidan con la búsqueda. Agrega el primer servicio del negocio.</div>}
       {message && <div className="moduleMessage">{message}</div>}
     </section>
