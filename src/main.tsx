@@ -1,11 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import AuthShell from './AuthShell'
-import BusinessProfileModule from './BusinessProfileModule'
+import AuthShellV2 from './AuthShellV2'
 import EducationModule from './EducationModule'
 import HelpCenter from './HelpCenter'
 import InstallPrompt from './InstallPrompt'
-import ModuleBridge from './ModuleBridge'
 import QuickTools from './QuickTools'
 import ZiviChrome from './ZiviChrome'
 import { initAutomaticBackup } from './cloudBackup'
@@ -125,11 +123,9 @@ async function bootstrap() {
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <AuthShell />
+      <AuthShellV2 />
       <ZiviChrome />
       <QuickTools />
-      <ModuleBridge />
-      <BusinessProfileModule />
       <EducationModule />
       <HelpCenter />
       <InstallPrompt />
