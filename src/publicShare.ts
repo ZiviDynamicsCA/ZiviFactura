@@ -1,4 +1,4 @@
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from './db'
 import { firebaseAuth, firestore } from './firebase'
 import { money, totals } from './pdf'
@@ -110,17 +110,25 @@ export async function publishPublicDocument(invoice: Invoice, company: Company) 
 
   if (firestore && user) {
     const url = `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`
+    const publicRef = doc(firestore, 'publicDocuments', id)
 
-    // No se bloquea el botón esperando la red. Esto evita que WhatsApp, mailto
-    // o el share nativo sean bloqueados por el navegador después de un await largo.
-    void setDoc(doc(firestore, 'publicDocuments', id), { ...payload, updatedAt: serverTimestamp() }, { merge: true })
-      .then(() => {
-        if (!invoice.publicShareId || invoice.publicShareId.startsWith('local-')) {
-          return db.invoices.update(invoice.id!, { publicShareId: id, updatedAt: new Date().toISOString() })
-        }
-        return undefined
-      })
-      .catch(error => console.warn('[ZiviFactura] publicación remota pendiente/fallida:', error))
+    // El enlace solo se entrega cuando Firestore confirma que el documento existe.
+    // Antes se compartía inmediatamente y el cliente podía abrirlo antes de que
+    // terminara setDoc(), provocando falsos "enlace no disponible" en Android/WhatsApp.
+    try {
+      await setDoc(publicRef, { ...payload, updatedAt: serverTimestamp() }, { merge: true })
+      const published = await getDoc(publicRef)
+      if (!published.exists() || published.data()?.active === false) {
+        throw new Error('El documento público no quedó disponible después de publicarlo.')
+      }
+
+      if (!invoice.publicShareId || invoice.publicShareId.startsWith('local-')) {
+        await db.invoices.update(invoice.id!, { publicShareId: id, updatedAt: new Date().toISOString() })
+      }
+    } catch (error) {
+      console.error('[ZiviFactura] no se pudo publicar el enlace:', error)
+      throw new Error('No pudimos publicar el enlace todavía. Verifica tu conexión e inténtalo nuevamente.')
+    }
 
     return { id, url, total: payload.total }
   }
