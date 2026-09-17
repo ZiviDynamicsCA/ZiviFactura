@@ -69,6 +69,11 @@ export interface Product {
   name: string
   price: number
   description?: string
+  category?: string
+  sku?: string
+  unit?: string
+  itemType?: 'service' | 'product'
+  active?: boolean
   createdAt: string
   updatedAt?: string
 }
