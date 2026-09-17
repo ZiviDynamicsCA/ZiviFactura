@@ -3,7 +3,7 @@ import { BriefcaseBusiness, CheckCircle2, Package, Pencil, Plus, Search, Trash2,
 import { db } from './db'
 import { getActiveCompanyId } from './companyScope'
 import { money } from './pdf'
-import type { Product } from './types'
+import type { Company, Product } from './types'
 import './modular-workspace.css'
 
 type Draft = {
@@ -35,13 +35,15 @@ function parseNumber(raw: string) {
 export default function CatalogView() {
   const companyId = getActiveCompanyId()
   const [rows, setRows] = useState<Product[]>([])
+  const [company, setCompany] = useState<Company | null>(null)
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Draft | null>(null)
   const [message, setMessage] = useState('')
 
   async function load() {
-    const all = await db.products.orderBy('name').toArray()
+    const [all, companyRow] = await Promise.all([db.products.orderBy('name').toArray(), db.company.get(companyId)])
     setRows(all.filter(row => (row.companyId || 1) === companyId))
+    setCompany(companyRow || null)
   }
 
   useEffect(() => { void load() }, [companyId])
@@ -54,6 +56,7 @@ export default function CatalogView() {
 
   const activeCount = rows.filter(row => row.active !== false).length
   const serviceCount = rows.filter(row => (row.itemType || 'service') === 'service').length
+  const currency = company?.currency || 'USD'
 
   function edit(row: Product) {
     setEditing({
@@ -132,7 +135,7 @@ export default function CatalogView() {
         <div className="catalogType">{(row.itemType || 'service') === 'service' ? 'SERVICIO' : 'PRODUCTO'}{row.category ? ` · ${row.category}` : ''}</div>
         <h3>{row.name}</h3>
         <p>{row.description || 'Sin descripción adicional.'}</p>
-        <div className="catalogMeta"><strong>{money(Number(row.price) || 0, 'USD')}</strong><span>{row.sku || 'Sin código'} · {row.unit || 'und'}</span></div>
+        <div className="catalogMeta"><strong>{money(Number(row.price) || 0, currency)}</strong><span>{row.sku || 'Sin código'} · {row.unit || 'und'}</span></div>
         <div className="catalogActions"><button onClick={() => edit(row)}><Pencil size={15}/>Editar</button><button onClick={() => void toggle(row)}>{row.active === false ? 'Activar' : 'Pausar'}</button><button className="danger" onClick={() => void remove(row)}><Trash2 size={15}/></button></div>
       </article>)}</div> : <div className="moduleEmpty">No hay elementos que coincidan con la búsqueda. Agrega el primer servicio del negocio.</div>}
       {message && <div className="moduleMessage">{message}</div>}
@@ -143,7 +146,7 @@ export default function CatalogView() {
       <div className="moduleFormGrid">
         <label className="wide"><span>Nombre *</span><input value={editing.name} onChange={event => setEditing({ ...editing, name: event.target.value })}/></label>
         <label><span>Tipo</span><select value={editing.itemType} onChange={event => setEditing({ ...editing, itemType: event.target.value as Draft['itemType'] })}><option value="service">Servicio</option><option value="product">Producto</option></select></label>
-        <label><span>Precio referencial</span><input inputMode="decimal" value={editing.price} onChange={event => setEditing({ ...editing, price: event.target.value })} placeholder="0,00"/></label>
+        <label><span>Precio referencial ({currency})</span><input inputMode="decimal" value={editing.price} onChange={event => setEditing({ ...editing, price: event.target.value })} placeholder="0,00"/></label>
         <label><span>Categoría</span><input value={editing.category} onChange={event => setEditing({ ...editing, category: event.target.value })} placeholder="Web, NFC, mantenimiento..."/></label>
         <label><span>Código / SKU</span><input value={editing.sku} onChange={event => setEditing({ ...editing, sku: event.target.value })}/></label>
         <label><span>Unidad</span><input value={editing.unit} onChange={event => setEditing({ ...editing, unit: event.target.value })} placeholder="und, servicio, hora"/></label>
