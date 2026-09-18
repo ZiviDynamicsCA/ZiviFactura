@@ -1,38 +1,42 @@
-/* Final mobile layout guard.
-   Keeps the fixed bottom dock in its own viewport area so it never covers
-   invoices, cards, actions or the end of any operational list. */
+/* Final mobile dock contract.
+   This file is intentionally loaded last. It neutralizes legacy dock rules
+   and keeps normal document flow, with real bottom space for the fixed dock. */
 
 @media (max-width: 760px) {
   :root {
     --zivi-mobile-header-height: 78px;
-    --zivi-mobile-dock-reserve: calc(112px + env(safe-area-inset-bottom, 0px));
+    --zivi-mobile-dock-space: calc(132px + env(safe-area-inset-bottom, 0px));
   }
 
   html,
-  body {
+  body,
+  #root {
     min-height: 100%;
   }
 
+  /* Keep the page in normal document flow. The previous fixed-height viewport
+     made the legal footer and the last invoice card slide behind the dock. */
   body.quick-nav-active:not(.quick-editor-active) {
-    height: 100dvh;
-    min-height: 100dvh;
-    overflow: hidden !important;
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
     padding-bottom: 0 !important;
   }
 
   body.quick-nav-active:not(.quick-editor-active) #root {
     box-sizing: border-box;
-    height: 100dvh;
-    min-height: 0;
-    overflow: hidden;
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
     padding-top: var(--zivi-mobile-header-height) !important;
-    padding-bottom: var(--zivi-mobile-dock-reserve) !important;
+    padding-bottom: 0 !important;
   }
 
   body.quick-nav-active:not(.quick-editor-active) .app {
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
+    height: auto !important;
+    min-height: calc(100dvh - var(--zivi-mobile-header-height)) !important;
+    overflow: visible !important;
   }
 
   body.quick-nav-active:not(.quick-editor-active) .page,
@@ -41,39 +45,105 @@
   body.quick-nav-active:not(.quick-editor-active) .receivablesPage,
   body.quick-nav-active:not(.quick-editor-active) .modulePage {
     box-sizing: border-box;
-    height: 100%;
-    max-height: 100%;
-    min-height: 0;
-    overflow-y: auto !important;
-    overscroll-behavior-y: contain;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 28px !important;
-    scroll-padding-bottom: 28px;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding-bottom: var(--zivi-mobile-dock-space) !important;
+    scroll-padding-bottom: var(--zivi-mobile-dock-space);
+  }
+
+  /* Legal links belong to the scrollable content. The parent reserve below
+     leaves a clean gap after them so they never sit under the fixed dock. */
+  body.quick-nav-active:not(.quick-editor-active) .appFooter,
+  body.quick-nav-active:not(.quick-editor-active) .appLegalFooter {
+    position: relative !important;
+    z-index: 1 !important;
+    margin: 18px 0 0 !important;
+    padding: 18px 8px 0 !important;
   }
 
   body.quick-nav-active:not(.quick-editor-active) .documentBoard {
     margin-bottom: 18px !important;
   }
 
-  body.quick-nav-active:not(.quick-editor-active) .appFooter,
-  body.quick-nav-active:not(.quick-editor-active) .appLegalFooter {
-    margin-bottom: 0 !important;
-    padding-bottom: 18px !important;
+  /* One explicit seven-column contract. This overrides old rules that were
+     written for a separate center FAB and were moving Nueva/Ingresos into
+     neighboring columns. */
+  body.quick-nav-active:not(.quick-editor-active) .quickDock {
+    left: 6px !important;
+    right: 6px !important;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    transform: none !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 74px !important;
+    max-height: none !important;
+    display: grid !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    grid-template-rows: 1fr !important;
+    grid-auto-flow: unset !important;
+    gap: 2px !important;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow: visible !important;
   }
 
-  body.quick-nav-active:not(.quick-editor-active) .quickDock {
-    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
-    max-height: 88px !important;
+  body.quick-nav-active:not(.quick-editor-active) .quickDock > button {
+    grid-row: 1 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    transform: none !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+    overflow: hidden !important;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .quickDock > button:nth-child(1) { grid-column: 1 !important; }
+  body.quick-nav-active:not(.quick-editor-active) .quickDock > button:nth-child(2) { grid-column: 2 !important; }
+  body.quick-nav-active:not(.quick-editor-active) .quickDock > button:nth-child(3) { grid-column: 3 !important; }
+  body.quick-nav-active:not(.quick-editor-active) .quickDock > button:nth-child(4) { grid-column: 4 !important; }
+  body.quick-nav-active:not(.quick-editor-active) .quickDock > button:nth-child(5) { grid-column: 5 !important; }
+  body.quick-nav-active:not(.quick-editor-active) .quickDock > button:nth-child(6) { grid-column: 6 !important; }
+  body.quick-nav-active:not(.quick-editor-active) .quickDock > button:nth-child(7) { grid-column: 7 !important; }
+
+  body.quick-nav-active:not(.quick-editor-active) .quickDock .quickDockCreate {
+    margin: -10px 0 0 !important;
+    min-height: 64px !important;
+    max-height: 68px !important;
+    z-index: 2 !important;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .quickDock button span {
+    max-width: 100% !important;
+    font-size: .48rem !important;
+    line-height: 1.05 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
   }
 
   body.quick-nav-active:not(.quick-editor-active) .quickCalculatorSheet,
   body.quick-nav-active:not(.quick-editor-active) .quickMoreSheet {
-    bottom: var(--zivi-mobile-dock-reserve) !important;
+    bottom: var(--zivi-mobile-dock-space) !important;
   }
 }
 
 @media (max-width: 430px) {
   :root {
-    --zivi-mobile-dock-reserve: calc(108px + env(safe-area-inset-bottom, 0px));
+    --zivi-mobile-dock-space: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .quickDock {
+    left: 4px !important;
+    right: 4px !important;
+    gap: 1px !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .quickDock button span {
+    font-size: .44rem !important;
   }
 }
