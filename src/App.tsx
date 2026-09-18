@@ -249,30 +249,16 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
 
   useEffect(() => {
     if (!initial.id || initial.status === 'draft' || initial.publicShareReadyAt) return
-    let cancelled = false
     try {
       const shared = preparePublicDocumentShare(initial, company)
       const source: Invoice = { ...initial, publicShareId: shared.id }
-      void publishPublicDocument(source, company, shared)
-        .then(async published => {
-          if (cancelled || !published.publishedAt) return
-          const ready: Invoice = {
-            ...source,
-            publicShareId: published.id,
-            publicShareReadyAt: published.publishedAt,
-          }
-          await db.invoices.put(ready)
-          if (!cancelled) {
-            setInvoice(current => current.id === ready.id
-              ? { ...current, publicShareId: ready.publicShareId, publicShareReadyAt: ready.publicShareReadyAt }
-              : current)
-          }
-        })
-        .catch(error => console.warn('[ZiviFactura] reparación de enlace público pendiente:', error))
+      publishPublicDocument(source, company, shared)
+      setInvoice(current => current.id === source.id
+        ? { ...current, publicShareId: shared.id }
+        : current)
     } catch (error) {
       console.warn('[ZiviFactura] no se pudo preparar reparación de enlace:', error)
     }
-    return () => { cancelled = true }
   }, [initial.id, initial.updatedAt, initial.publicShareReadyAt, initial.status, company.id])
   const set = <K extends keyof Invoice>(k: K, v: Invoice[K]) => setInvoice(p => ({ ...p, [k]: v }))
   const setClient = (k: keyof Invoice['client'], v: string) => setInvoice(p => ({ ...p, client: { ...p.client, [k]: v } }))
@@ -341,7 +327,6 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
         status: status ?? invoice.status,
         items: validItems,
         updatedAt: new Date().toISOString(),
-        publicShareReadyAt: undefined,
       }
 
       let id = invoice.id
@@ -353,26 +338,14 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
 
       let finalSaved: Invoice = { ...payload, id }
 
-      // Issued documents must be confirmed in Firestore before we call their
-      // short public URL "ready". This prevents WhatsApp from receiving a link
-      // to a document that does not exist yet.
       if (finalSaved.status !== 'draft' || finalSaved.publicShareId) {
         try {
           const shared = preparePublicDocumentShare(finalSaved, company)
           finalSaved = { ...finalSaved, publicShareId: shared.id }
           await db.invoices.put(finalSaved)
-          const published = await publishPublicDocument(finalSaved, company, shared)
-          finalSaved = {
-            ...finalSaved,
-            publicShareId: published.id,
-            publicShareReadyAt: published.publishedAt,
-          }
-          await db.invoices.put(finalSaved)
+          publishPublicDocument(finalSaved, company, shared)
         } catch (error) {
-          console.error('[ZiviFactura] publicación al guardar:', error)
-          notify(error instanceof Error
-            ? `Documento guardado, pero el enlace público no quedó listo: ${error.message}`
-            : 'Documento guardado, pero el enlace público no quedó listo.')
+          console.warn('[ZiviFactura] publicación anticipada no disponible:', error)
         }
       }
 
@@ -383,37 +356,19 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
     }
   }
 
-  async function ensurePublishedLink() {
+  function prepareInstantLink() {
     if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo.')
-
     const shared = preparePublicDocumentShare(invoice, company)
-    if (
-      invoice.publicShareReadyAt
-      && invoice.publicShareId === shared.id
-      && !shared.id.startsWith('local-')
-    ) {
-      return shared
-    }
-
-    notify('Publicando enlace seguro…')
     const source: Invoice = { ...invoice, publicShareId: shared.id }
-    const published = await publishPublicDocument(source, company, shared)
-    const ready: Invoice = {
-      ...source,
-      publicShareId: published.id,
-      publicShareReadyAt: published.publishedAt,
-    }
-    setInvoice(ready)
-    if (ready.id) await db.invoices.put(ready)
-    return published
+    setInvoice(source)
+    publishPublicDocument(source, company, shared)
+    return shared
   }
 
-  const download = async () => {
+  const download = () => {
     try {
-      const shared = invoice.id ? await ensurePublishedLink() : null
-      const source = shared
-        ? { ...invoice, publicShareId: shared.id, publicShareReadyAt: shared.publishedAt }
-        : invoice
+      const shared = invoice.id ? prepareInstantLink() : null
+      const source = shared ? { ...invoice, publicShareId: shared.id } : invoice
       buildInvoicePdf(source, company, shared?.url || '').save(`${invoice.number}.pdf`)
     } catch (error) {
       notify(error instanceof Error ? error.message : 'No se pudo preparar el enlace del PDF.')
@@ -444,7 +399,7 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
   const share = async () => {
     if (!invoice.client.name.trim()) return notify('Completa el cliente antes de compartir.')
     try {
-      const shared = await ensurePublishedLink()
+      const shared = prepareInstantLink()
       const nativeText = shareDocumentMessage(invoice, shared.url, shared.total, false)
 
       if (navigator.share) {
@@ -467,10 +422,10 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
     }
   }
 
-  const whatsapp = async () => {
+  const whatsapp = () => {
     if (!invoice.client.name.trim()) return notify('Completa el cliente antes de compartir.')
     try {
-      const shared = await ensurePublishedLink()
+      const shared = prepareInstantLink()
       const message = shareDocumentMessage(invoice, shared.url, shared.total)
       const phone = invoice.client.phone.replace(/\D/g, '')
       const target = phone
@@ -482,10 +437,10 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
     }
   }
 
-  const email = async () => {
+  const email = () => {
     if (!invoice.client.email.trim()) return notify('Agrega el correo del cliente antes de preparar el correo.')
     try {
-      const shared = await ensurePublishedLink()
+      const shared = prepareInstantLink()
       const message = shareDocumentMessage(invoice, shared.url, shared.total)
       window.location.href = `mailto:${invoice.client.email}?subject=${encodeURIComponent(`${invoice.type} ${invoice.number}`)}&body=${encodeURIComponent(`${message}\n\nSaludos.`)}`
     } catch (error) {

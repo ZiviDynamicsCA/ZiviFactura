@@ -39,7 +39,7 @@ function publicCompany(company: Company) {
   return {
     id: company.id,
     syncId: company.syncId || '',
-    name: company.name,
+    name: company.name || '',
     taxId: company.taxId || '',
     phone: company.phone || '',
     email: company.email || '',
@@ -68,20 +68,20 @@ function buildPublicPayload(invoice: Invoice, company: Company, ownerUid = 'loca
     active: true,
     localOnly: ownerUid === 'local',
     ownerUid,
-    companyId: company.id,
+    companyId: Number(company.id) || 1,
     companySyncId: company.syncId || '',
     invoiceSyncId: invoice.syncId || '',
-    invoiceNumber: invoice.number,
+    invoiceNumber: invoice.number || '',
     invoiceType: invoice.type,
     status: invoice.status,
-    date: invoice.date,
+    date: invoice.date || '',
     dueDate: invoice.dueDate || '',
-    currency: invoice.currency,
-    subtotal: documentTotals.subtotal,
-    discount: documentTotals.discount,
-    tax: documentTotals.tax,
+    currency: invoice.currency || 'USD',
+    subtotal: Number(documentTotals.subtotal) || 0,
+    discount: Number(documentTotals.discount) || 0,
+    tax: Number(documentTotals.tax) || 0,
     taxRate: Number(invoice.taxRate) || 0,
-    total: documentTotals.total,
+    total: Number(documentTotals.total) || 0,
     client: {
       name: invoice.client.name || 'Cliente',
       taxId: invoice.client.taxId || '',
@@ -91,7 +91,7 @@ function buildPublicPayload(invoice: Invoice, company: Company, ownerUid = 'loca
     },
     items: invoice.items.map(item => ({
       id: item.id || '',
-      description: item.description,
+      description: item.description || '',
       quantity: Number(item.quantity) || 0,
       unitPrice: Number(item.unitPrice) || 0,
     })),
@@ -114,6 +114,105 @@ export type PreparedPublicShare = {
   payload: ReturnType<typeof buildPublicPayload>
 }
 
+function safePayload<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function restValue(value: unknown): Record<string, unknown> {
+  if (value === null || value === undefined) return { nullValue: null }
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(restValue) } }
+
+  switch (typeof value) {
+    case 'string': return { stringValue: value }
+    case 'boolean': return { booleanValue: value }
+    case 'number':
+      return Number.isInteger(value)
+        ? { integerValue: String(value) }
+        : { doubleValue: value }
+    case 'object': {
+      const fields: Record<string, unknown> = {}
+      Object.entries(value as Record<string, unknown>).forEach(([key, entry]) => {
+        if (entry !== undefined) fields[key] = restValue(entry)
+      })
+      return { mapValue: { fields } }
+    }
+    default:
+      return { stringValue: String(value) }
+  }
+}
+
+function restFields(value: Record<string, unknown>) {
+  const fields: Record<string, unknown> = {}
+  Object.entries(value).forEach(([key, entry]) => {
+    if (entry !== undefined) fields[key] = restValue(entry)
+  })
+  return fields
+}
+
+async function publishViaRest(
+  id: string,
+  payload: Record<string, unknown>,
+  user: NonNullable<typeof firebaseAuth>['currentUser'],
+) {
+  if (!user) throw new Error('No hay una sesión activa para publicar el documento.')
+  const token = await withTimeout(user.getIdToken(), 4000, 'No se pudo obtener la sesión de Firebase.')
+  const endpoint = `https://firestore.googleapis.com/v1/projects/zivifactura/databases/(default)/documents/publicDocuments/${encodeURIComponent(id)}`
+  const response = await withTimeout(fetch(endpoint, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      fields: restFields({ ...payload, updatedAt: new Date().toISOString() }),
+    }),
+  }), 8000, 'Firestore REST no respondió a tiempo.')
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`Firestore REST ${response.status}: ${detail.slice(0, 240)}`)
+  }
+}
+
+async function markPublished(invoice: Invoice, shareIdValue: string) {
+  if (!invoice.id) return
+  const publishedAt = new Date().toISOString()
+  await db.invoices.update(invoice.id, {
+    publicShareId: shareIdValue,
+    publicShareReadyAt: publishedAt,
+  })
+}
+
+async function publishCloudInBackground(
+  invoice: Invoice,
+  shared: PreparedPublicShare,
+  user: NonNullable<typeof firebaseAuth>['currentUser'],
+) {
+  if (!firestore || !user || shared.id.startsWith('local-')) return
+
+  const payload = safePayload(shared.payload) as Record<string, unknown>
+  const publicRef = doc(firestore, 'publicDocuments', shared.id)
+
+  try {
+    await withTimeout(
+      setDoc(publicRef, { ...payload, updatedAt: serverTimestamp() }, { merge: true }),
+      3500,
+      'Firestore SDK lento',
+    )
+    await markPublished(invoice, shared.id)
+    return
+  } catch (sdkError) {
+    console.warn('[ZiviFactura] Firestore SDK lento/fallido; usando REST:', sdkError)
+  }
+
+  try {
+    await publishViaRest(shared.id, payload, user)
+    await markPublished(invoice, shared.id)
+  } catch (restError) {
+    console.error('[ZiviFactura] publicación pública falló por SDK y REST:', restError)
+  }
+}
+
 export function preparePublicDocumentShare(invoice: Invoice, company: Company): PreparedPublicShare {
   if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo por enlace.')
 
@@ -131,55 +230,26 @@ export function preparePublicDocumentShare(invoice: Invoice, company: Company): 
       })}`
 
   if (invoice.id && invoice.publicShareId !== id) {
-    void db.invoices.update(invoice.id, { publicShareId: id, updatedAt: new Date().toISOString() })
+    void db.invoices.update(invoice.id, { publicShareId: id })
       .catch(error => console.warn('[ZiviFactura] no se pudo guardar el id público localmente:', error))
   }
 
   return { id, url, total: payload.total, payload }
 }
 
-export async function publishPublicDocument(
+export function publishPublicDocument(
   invoice: Invoice,
   company: Company,
   prepared?: PreparedPublicShare,
-): Promise<PreparedPublicShare & { publishedAt?: string }> {
+): PreparedPublicShare {
   const shared = prepared || preparePublicDocumentShare(invoice, company)
   const user = firebaseAuth?.currentUser || null
 
-  if (!firestore || !user || shared.id.startsWith('local-')) return shared
-
-  const publicRef = doc(firestore, 'publicDocuments', shared.id)
-  try {
-    // JSON round-trip strips every undefined value before it reaches Firestore.
-    // Firestore rejects an entire write if even one optional field is undefined.
-    const safePayload = JSON.parse(JSON.stringify(shared.payload))
-    await withTimeout(
-      setDoc(publicRef, { ...safePayload, updatedAt: serverTimestamp() }, { merge: true }),
-      15000,
-      'Firebase tardó demasiado publicando el documento.',
-    )
-
-    const publishedAt = new Date().toISOString()
-    if (invoice.id) {
-      await db.invoices.update(invoice.id, {
-        publicShareId: shared.id,
-        publicShareReadyAt: publishedAt,
-        updatedAt: invoice.updatedAt || publishedAt,
-      })
-    }
-    return { ...shared, publishedAt }
-  } catch (error) {
-    const code = (error as { code?: string })?.code || ''
-    const detail = error instanceof Error ? error.message : String(error || '')
-    console.warn('[ZiviFactura] publicación remota fallida:', code, detail, error)
-    if (code === 'permission-denied') {
-      throw new Error('Firebase rechazó la publicación del documento. Deben revisarse las reglas de Firestore.')
-    }
-    if (code === 'unavailable' || code === 'network-request-failed') {
-      throw new Error('No hubo conexión con Firebase para publicar el documento.')
-    }
-    throw new Error(detail || 'No se pudo publicar el documento en Firebase.')
+  if (firestore && user && !shared.id.startsWith('local-')) {
+    void publishCloudInBackground(invoice, shared, user)
   }
+
+  return shared
 }
 
 export function shareDocumentMessage(
