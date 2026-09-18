@@ -10,7 +10,7 @@ import ReceivablesView from './ReceivablesView'
 import { createCompany, db, defaultCompany, ensureCompany } from './db'
 import { getActiveCompanyId, setActiveCompanyId } from './companyScope'
 import { labelForProfile, modulesForProfile, type BusinessModuleKey, type BusinessProfileKey } from './businessProfiles'
-import { createEmailAccount, firebaseConfigured, isPasswordAccount, observeAuth, refreshAccountVerification, requestPasswordReset, sendAccountVerification, signInWithEmail, signInWithGoogle, signOutFirebase, type FirebaseUser } from './firebase'
+import { createEmailAccount, firebaseConfigured, isPasswordAccount, observeAuth, readVerificationEmailStatus, refreshAccountVerification, requestPasswordReset, sendAccountVerification, signInWithEmail, signInWithGoogle, signOutFirebase, type FirebaseUser } from './firebase'
 import { startFirebaseSync, syncFirebaseNow, type SyncState } from './firebaseSync'
 import type { Company } from './types'
 import './auth.css'
@@ -61,6 +61,8 @@ function authError(error: unknown) {
   if (code === 'auth/operation-not-allowed') return 'El acceso con correo y contraseña todavía no está habilitado en Firebase Authentication.'
   if (code === 'auth/too-many-requests') return 'Hubo demasiados intentos. Espera unos minutos e inténtalo nuevamente.'
   if (code === 'auth/network-request-failed') return 'No se pudo conectar. Verifica tu conexión a internet.'
+  if (code === 'auth/unauthorized-continue-uri' || code === 'auth/invalid-continue-uri') return 'Firebase rechazó la URL de retorno configurada para el correo. Ya estamos usando el flujo estándar para evitar este bloqueo.'
+  if (code === 'auth/quota-exceeded') return 'Firebase alcanzó temporalmente el límite de correos de autenticación. Intenta nuevamente más tarde.'
   const message = error instanceof Error ? error.message : 'No se pudo completar la operación.'
   return message.replace('Firebase:', '').trim()
 }
@@ -160,7 +162,7 @@ function LoginScreen({ onLocal }: { onLocal: () => void }) {
         paymentNotes: signup.paymentNotes.trim(),
       })
       setActiveCompanyId(1)
-      await sendAccountVerification(credential.user).catch(() => undefined)
+      await sendAccountVerification(credential.user)
     } catch (err) {
       setError(authError(err))
       setBusy(false)
@@ -242,9 +244,15 @@ function LoginScreen({ onLocal }: { onLocal: () => void }) {
 }
 
 function VerifyEmailScreen({ user, onVerified, onLogout }: { user: FirebaseUser; onVerified: () => void; onLogout: () => void }) {
+  const previousStatus = readVerificationEmailStatus()
+  const statusForThisEmail = previousStatus?.email && previousStatus.email === (user.email || '') ? previousStatus : null
   const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState('Revisa tu bandeja de entrada y también la carpeta de spam.')
-  const [error, setError] = useState('')
+  const [notice, setNotice] = useState(statusForThisEmail?.ok
+    ? 'Firebase aceptó el envío del correo de verificación. Revisa Recibidos, Spam y Promociones.'
+    : 'Pulsa “Reenviar correo” para solicitar un nuevo enlace de verificación.')
+  const [error, setError] = useState(statusForThisEmail && !statusForThisEmail.ok
+    ? authError({ code: statusForThisEmail.code, message: statusForThisEmail.message })
+    : '')
 
   async function resend() {
     setBusy(true)
@@ -252,7 +260,7 @@ function VerifyEmailScreen({ user, onVerified, onLogout }: { user: FirebaseUser;
     setNotice('')
     try {
       await sendAccountVerification(user)
-      setNotice('Correo reenviado. Puede tardar unos segundos en llegar.')
+      setNotice('Firebase aceptó el reenvío. Revisa Recibidos, Spam y Promociones; el remitente puede aparecer como noreply de Firebase.')
     } catch (err) {
       setError(authError(err))
     } finally {

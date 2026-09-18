@@ -28,7 +28,31 @@ export const firebaseAuth = firebaseApp ? getAuth(firebaseApp) : null
 export const firestore = firebaseApp ? getFirestore(firebaseApp) : null
 
 if (firebaseAuth) {
+  firebaseAuth.languageCode = 'es'
   setPersistence(firebaseAuth, browserLocalPersistence).catch(() => undefined)
+}
+
+export type VerificationEmailStatus = {
+  ok: boolean
+  email: string
+  at: string
+  code?: string
+  message?: string
+}
+
+const VERIFICATION_STATUS_KEY = 'zivifactura.verification-email-status'
+
+function saveVerificationEmailStatus(status: VerificationEmailStatus) {
+  try { sessionStorage.setItem(VERIFICATION_STATUS_KEY, JSON.stringify(status)) } catch { /* optional diagnostic state */ }
+}
+
+export function readVerificationEmailStatus() {
+  try {
+    const raw = sessionStorage.getItem(VERIFICATION_STATUS_KEY)
+    return raw ? JSON.parse(raw) as VerificationEmailStatus : null
+  } catch {
+    return null
+  }
 }
 
 const googleProvider = new GoogleAuthProvider()
@@ -76,7 +100,20 @@ export async function sendAccountVerification(user?: User | null) {
   const target = user || firebaseAuth?.currentUser
   if (!target) throw new Error('No hay una cuenta activa para verificar.')
   if (target.emailVerified || !isPasswordAccount(target)) return
-  await sendEmailVerification(target, { url: `${window.location.origin}/` })
+
+  const email = target.email || ''
+  try {
+    // Do not attach a continueUrl here. Verification does not require one and
+    // using window.location.origin makes delivery depend on Firebase Authorized
+    // Domains configuration. The default Firebase action handler is sufficient.
+    await sendEmailVerification(target)
+    saveVerificationEmailStatus({ ok: true, email, at: new Date().toISOString() })
+  } catch (error) {
+    const code = (error as { code?: string })?.code || ''
+    const message = error instanceof Error ? error.message : String(error || 'No se pudo enviar el correo.')
+    saveVerificationEmailStatus({ ok: false, email, at: new Date().toISOString(), code, message })
+    throw error
+  }
 }
 
 export async function refreshAccountVerification(user?: User | null) {
@@ -88,7 +125,9 @@ export async function refreshAccountVerification(user?: User | null) {
 
 export async function requestPasswordReset(email: string) {
   if (!firebaseAuth) throw new Error('Firebase todavía no está configurado.')
-  await sendPasswordResetEmail(firebaseAuth, email.trim().toLowerCase(), { url: `${window.location.origin}/` })
+  // Password reset also works without a custom continueUrl and therefore does
+  // not depend on the Vercel domain being present in Firebase Authorized Domains.
+  await sendPasswordResetEmail(firebaseAuth, email.trim().toLowerCase())
 }
 
 export async function signOutFirebase() {
