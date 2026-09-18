@@ -1,0 +1,79 @@
+/* Final mobile layout guard.
+   Keeps the fixed bottom dock in its own viewport area so it never covers
+   invoices, cards, actions or the end of any operational list. */
+
+@media (max-width: 760px) {
+  :root {
+    --zivi-mobile-header-height: 78px;
+    --zivi-mobile-dock-reserve: calc(112px + env(safe-area-inset-bottom, 0px));
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden !important;
+    padding-bottom: 0 !important;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) #root {
+    box-sizing: border-box;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    padding-top: var(--zivi-mobile-header-height) !important;
+    padding-bottom: var(--zivi-mobile-dock-reserve) !important;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .app {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .page,
+  body.quick-nav-active:not(.quick-editor-active) .adminPage,
+  body.quick-nav-active:not(.quick-editor-active) .paymentsPage,
+  body.quick-nav-active:not(.quick-editor-active) .receivablesPage,
+  body.quick-nav-active:not(.quick-editor-active) .modulePage {
+    box-sizing: border-box;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 28px !important;
+    scroll-padding-bottom: 28px;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .documentBoard {
+    margin-bottom: 18px !important;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .appFooter,
+  body.quick-nav-active:not(.quick-editor-active) .appLegalFooter {
+    margin-bottom: 0 !important;
+    padding-bottom: 18px !important;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .quickDock {
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    max-height: 88px !important;
+  }
+
+  body.quick-nav-active:not(.quick-editor-active) .quickCalculatorSheet,
+  body.quick-nav-active:not(.quick-editor-active) .quickMoreSheet {
+    bottom: var(--zivi-mobile-dock-reserve) !important;
+  }
+}
+
+@media (max-width: 430px) {
+  :root {
+    --zivi-mobile-dock-reserve: calc(108px + env(safe-area-inset-bottom, 0px));
+  }
+}
