@@ -295,19 +295,29 @@ export function buildInvoicePdf(invoice: Invoice, company: Company) {
     selectedCopyTargets.includes('USDT_AVERAGE') && equivalents.USDT_AVERAGE != null ? { label: 'USDT promedio', value: `${plain(equivalents.USDT_AVERAGE)} USDT` } : null,
   ].filter((item): item is CopyRow => Boolean(item)) : []
 
-  const copyUrl = hasPaymentData ? copyPageUrl({
+  const publishedDocumentUrl = typeof window !== 'undefined'
+    && invoice.publicShareId
+    && !invoice.publicShareId.startsWith('local-')
+      ? `${window.location.origin}/documento.html?id=${encodeURIComponent(invoice.publicShareId)}`
+      : ''
+
+  const copyUrl = hasPaymentData ? (publishedDocumentUrl || copyPageUrl({
     version: 1,
     company: company.name || 'Empresa',
     invoice: invoice.number,
     client: invoice.client.name || 'Cliente',
     total: money(total, invoice.currency),
+    invoiceCurrency: invoice.currency,
+    invoiceTotal: total,
+    expectedVes: equivalents?.ves,
+    rateValue: invoice.rateValue,
     rate: invoice.rateValue ? {
       label: invoice.rateLabel || 'Tasa aplicada',
       value: `${plain(invoice.rateValue)} Bs`,
     } : undefined,
     equivalents: copyEquivalents,
     groups: copyGroups,
-  }) : ''
+  })) : ''
 
   if (hasPaymentData) {
     const basePaymentH = showNotes ? (columns.length ? 118 : 82) : 94

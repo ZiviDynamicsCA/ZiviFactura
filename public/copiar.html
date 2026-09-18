@@ -59,51 +59,55 @@
   function row(label,value){const item=document.createElement('div');item.className='row';const text=document.createElement('div'),labelEl=document.createElement('span'),valueEl=document.createElement('strong');labelEl.textContent=label;valueEl.textContent=value;text.append(labelEl,valueEl);const button=document.createElement('button');button.type='button';button.className='copy';button.textContent='Copiar';button.addEventListener('click',()=>copyText(value,button));item.append(text,button);return item}
   function parseAmount(raw){let value=String(raw||'').trim().replace(/\s/g,'').replace(/[^0-9,.-]/g,'');const comma=value.lastIndexOf(','),dot=value.lastIndexOf('.');if(comma>=0&&dot>=0)value=comma>dot?value.replace(/\./g,'').replace(',','.'):value.replace(/,/g,'');else if(comma>=0)value=value.replace(',','.');const parsed=Number(value);return Number.isFinite(parsed)?parsed:0}
   function proofMessage(text,ok=false){const box=$('proofMessage');box.textContent=text;box.className=`proofMessage ${ok?'ok':'bad'}`}
-  async function ensurePublicFirebase(){if(publicAuth?.currentUser)return publicAuth.currentUser;const app=initializeApp(firebaseConfig,`proof-${Math.random().toString(36).slice(2)}`);publicAuth=initializeAuth(app,{persistence:inMemoryPersistence});publicDb=getFirestore(app);const credential=await signInAnonymously(publicAuth);return credential.user}
-
-  function loadImage(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const image=new Image();image.onerror=reject;image.onload=()=>resolve(image);image.src=String(reader.result)};reader.readAsDataURL(file)})}
+  async function ensurePublicFirebase(){if(publicAuth?.currentUser)return publicAuth.currentUser;if(!publicAuth){const app=initializeApp(firebaseConfig,`proof-${Date.now()}`);publicAuth=initializeAuth(app,{persistence:inMemoryPersistence});publicDb=getFirestore(app)}const credential=await withTimeout(signInAnonymously(publicAuth),12000,'Firebase no respondió al validar el envío.');return credential.user}
+  function withTimeout(promise,ms,label){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error(label||'La operación tardó demasiado.')),ms);Promise.resolve(promise).then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})})}
+  function loadImage(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('No se pudo leer la imagen.'));reader.onload=()=>{const image=new Image();image.onerror=()=>reject(new Error('El archivo seleccionado no es una imagen válida.'));image.onload=()=>resolve(image);image.src=String(reader.result)};reader.readAsDataURL(file)})}
   async function compressImage(file){
     if(!file.type.startsWith('image/'))throw new Error('Solo se permiten imágenes.')
-    if(file.size>15*1024*1024)throw new Error('La imagen original supera 15 MB.')
-    const image=await loadImage(file)
-    const maxSide=1700,ratio=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight))
-    let width=Math.max(1,Math.round(image.naturalWidth*ratio)),height=Math.max(1,Math.round(image.naturalHeight*ratio)),quality=.84,dataUrl=''
-    for(let attempt=0;attempt<7;attempt++){
+    if(file.size>12*1024*1024)throw new Error('La imagen original supera 12 MB. Usa un capture más pequeño.')
+    const image=await withTimeout(loadImage(file),12000,'El teléfono tardó demasiado leyendo la imagen.')
+    const maxSide=1280,ratio=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight))
+    let width=Math.max(1,Math.round(image.naturalWidth*ratio)),height=Math.max(1,Math.round(image.naturalHeight*ratio)),quality=.78,dataUrl=''
+    for(let attempt=0;attempt<5;attempt++){
       const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height
-      const ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(image,0,0,width,height)
+      const ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('Este navegador no pudo preparar la imagen.')
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.drawImage(image,0,0,width,height)
       dataUrl=canvas.toDataURL('image/jpeg',quality)
-      if(dataUrl.length<=620000)break
-      quality=Math.max(.48,quality-.08);width=Math.max(700,Math.round(width*.88));height=Math.max(700,Math.round(height*.88))
+      if(dataUrl.length<=450000)break
+      quality=Math.max(.48,quality-.08);width=Math.max(520,Math.round(width*.86));height=Math.max(520,Math.round(height*.86))
     }
-    if(dataUrl.length>680000)throw new Error('No fue posible reducir esta imagen lo suficiente. Toma un capture más pequeño e inténtalo de nuevo.')
+    if(dataUrl.length>560000)throw new Error('No fue posible reducir esta imagen lo suficiente. Toma un capture más pequeño e inténtalo de nuevo.')
     return{dataUrl,size:Math.round((dataUrl.length-dataUrl.indexOf(',')-1)*.75),width,height}
   }
+
+  function proofFailure(error){const code=error?.code||'',message=String(error?.message||'');if(code.includes('operation-not-allowed'))return 'Firebase tiene deshabilitado el acceso anónimo para recibir comprobantes. Activa Anonymous Authentication en el proyecto.';if(code.includes('permission-denied'))return 'Firestore rechazó el comprobante. El emisor debe revisar las reglas de recepción de pagos.';if(code.includes('network-request-failed'))return 'No hubo respuesta de red. Cambia de conexión e inténtalo nuevamente.';if(/tardó demasiado|no respondió/i.test(message))return message+' La operación se detuvo para evitar que quede cargando indefinidamente.';return code?`No se pudo enviar (${code}).`:'No se pudo enviar el comprobante. Revisa tu conexión e inténtalo nuevamente.'}
 
   async function prepareProofFile(file){
     compressedProof=null;$('proofPreview').style.display='none'
     if(!file){$('fileName').textContent='';return}
-    try{proofMessage('Comprimiendo el comprobante para enviarlo…',true);compressedProof=await compressImage(file);$('fileName').textContent=`${file.name} · original ${(file.size/1024/1024).toFixed(2)} MB · optimizado ${(compressedProof.size/1024).toFixed(0)} KB`;$('proofPreview').src=compressedProof.dataUrl;$('proofPreview').style.display='block';$('proofMessage').className='proofMessage'}catch(error){$('proofFile').value='';$('fileName').textContent='';proofMessage(error?.message||'No se pudo preparar la imagen.')}
+    try{proofMessage('Preparando el comprobante…',true);compressedProof=await withTimeout(compressImage(file),18000,'El teléfono tardó demasiado preparando la imagen.');$('fileName').textContent=`${file.name} · original ${(file.size/1024/1024).toFixed(2)} MB · optimizado ${(compressedProof.size/1024).toFixed(0)} KB`;$('proofPreview').src=compressedProof.dataUrl;$('proofPreview').style.display='block';$('proofMessage').className='proofMessage'}catch(error){$('proofFile').value='';$('fileName').textContent='';proofMessage(error?.message||'No se pudo preparar la imagen.')}
   }
 
   async function submitProof(event){
     event.preventDefault();const button=$('submitProof'),file=$('proofFile').files?.[0],amountPaid=parseAmount($('paidAmount').value)
-    if(!data?.ownerUid)return proofMessage('Esta factura no tiene habilitada la recepción de comprobantes.')
+    if(!data?.ownerUid||data.ownerUid==='local')return proofMessage('Esta factura no tiene habilitada la recepción de comprobantes.')
     if(!amountPaid)return proofMessage('Indica el monto que pagaste.')
     if(!file||!compressedProof)return proofMessage('Selecciona y espera a que se prepare el voucher o capture.')
-    button.disabled=true;button.textContent='Enviando comprobante…';proofMessage('Enviando imagen optimizada de forma segura…',true)
+    button.disabled=true;button.textContent='Validando conexión…';proofMessage('1 de 2 · Validando conexión segura con Firebase…',true)
     try{
       const user=await ensurePublicFirebase(),id=crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`
-      await setDoc(doc(publicDb,'paymentProofs',data.ownerUid,'submissions',id),{
+      button.textContent='Guardando comprobante…';proofMessage('2 de 2 · Guardando comprobante para revisión…',true)
+      await withTimeout(setDoc(doc(publicDb,'paymentProofs',data.ownerUid,'submissions',id),{
         ownerUid:data.ownerUid,submitterUid:user.uid,invoiceNumber:data.invoice||'',clientName:data.client||'',amountPaid,
         amountCurrency:$('paidCurrency').value,paymentMethod:$('paidMethod').value,paymentDate:$('paidDate').value,
         reference:$('paidReference').value.trim(),note:$('paidNote').value.trim(),imageData:compressedProof.dataUrl,
         storagePath:`firestore-inline:${data.ownerUid}:${id}`,originalFileName:file.name.slice(0,180),contentType:'image/jpeg',
         size:compressedProof.size,originalSize:file.size,status:'pending',invoiceCurrency:data.invoiceCurrency||'',invoiceTotal:Number(data.invoiceTotal)||0,
         rateValue:Number(data.rateValue)||null,createdAt:serverTimestamp()
-      })
+      }),25000,'Firestore tardó demasiado guardando el comprobante.')
       proofMessage('Comprobante enviado correctamente. El emisor lo recibirá en ZiviFactura para revisarlo y registrar tu pago.',true)
       $('proofForm').reset();$('paidDate').value=new Date().toISOString().slice(0,10);$('fileName').textContent='';$('proofPreview').style.display='none';compressedProof=null
-    }catch(error){console.error(error);const code=error?.code||'';if(code.includes('operation-not-allowed'))proofMessage('La recepción de comprobantes todavía no está habilitada. El emisor debe activar el acceso anónimo en Firebase Authentication.');else if(code.includes('permission-denied'))proofMessage('No fue posible guardar el comprobante. El emisor debe publicar las reglas de Firestore de ZiviFactura.');else proofMessage('No se pudo enviar el comprobante. Revisa tu conexión e inténtalo nuevamente.')}finally{button.disabled=false;button.textContent='Enviar comprobante para revisión'}
+    }catch(error){console.error(error);proofMessage(proofFailure(error))}finally{button.disabled=false;button.textContent='Enviar comprobante para revisión'}
   }
 
   try{
