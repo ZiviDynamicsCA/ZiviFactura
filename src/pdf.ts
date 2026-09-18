@@ -49,7 +49,7 @@ function availablePaymentMethods(company: Company): PaymentDisplay[] {
   return methods
 }
 
-export function buildInvoicePdf(invoice: Invoice, company: Company) {
+export function buildInvoicePdf(invoice: Invoice, company: Company, publicUrl = '') {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const { subtotal, discount, tax, total } = totals(invoice)
   const equivalents = invoiceEquivalentValues(invoice, total)
@@ -295,11 +295,11 @@ export function buildInvoicePdf(invoice: Invoice, company: Company) {
     selectedCopyTargets.includes('USDT_AVERAGE') && equivalents.USDT_AVERAGE != null ? { label: 'USDT promedio', value: `${plain(equivalents.USDT_AVERAGE)} USDT` } : null,
   ].filter((item): item is CopyRow => Boolean(item)) : []
 
-  const publishedDocumentUrl = typeof window !== 'undefined'
+  const publishedDocumentUrl = publicUrl || (typeof window !== 'undefined'
     && invoice.publicShareId
     && !invoice.publicShareId.startsWith('local-')
       ? `${window.location.origin}/documento.html?id=${encodeURIComponent(invoice.publicShareId)}`
-      : ''
+      : '')
 
   const copyUrl = hasPaymentData ? (publishedDocumentUrl || copyPageUrl({
     version: 1,
