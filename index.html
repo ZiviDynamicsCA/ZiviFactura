@@ -9,13 +9,29 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="application-name" content="ZiviFactura" />
-    <link rel="manifest" href="/manifest.webmanifest?v=43" />
-    <link rel="icon" href="/zivifactura-app-512-v43.png?v=43" type="image/png" />
+    <link rel="manifest" href="/manifest.webmanifest?v=56" />
+    <link rel="icon" href="/zivifactura-app-192-v43.png?v=56" type="image/png" />
     <link rel="apple-touch-icon" href="/zivifactura-app-512-v43.png?v=43" />
     <title>ZiviFactura</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-fallback" style="min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f6faff;color:#102348;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:center">
+        <div style="max-width:420px">
+          <div style="width:68px;height:68px;margin:0 auto 16px;border-radius:20px;background:#fff;display:grid;place-items:center;box-shadow:0 12px 32px rgba(20,70,125,.12);font-size:28px;font-weight:900;color:#079cff">Z</div>
+          <strong style="display:block;font-size:1.2rem">Abriendo ZiviFactura…</strong>
+          <p style="margin:8px 0 0;color:#65779a;line-height:1.5">Preparando la aplicación en este dispositivo.</p>
+          <button id="boot-retry" type="button" onclick="location.reload()" style="display:none;margin:18px auto 0;border:0;border-radius:12px;background:#079cff;color:white;padding:11px 16px;font:inherit;font-weight:800">Reintentar</button>
+        </div>
+      </div>
+      <script>
+        window.setTimeout(function () {
+          var fallback = document.getElementById('boot-fallback');
+          var retry = document.getElementById('boot-retry');
+          if (fallback && retry) retry.style.display = 'inline-flex';
+        }, 6000);
+      </script>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

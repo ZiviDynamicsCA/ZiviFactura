@@ -1,20 +1,40 @@
-const CACHE = 'zivifactura-shell-v55'
+const CACHE = 'zivifactura-shell-v56'
 const APP_SHELL = [
-  '/',
-  '/manifest.webmanifest?v=43',
-  '/zivifactura-app-192-v43.png?v=43',
-  '/zivifactura-app-512-v43.png?v=43',
+  '/manifest.webmanifest?v=56',
+  '/zivifactura-app-192-v43.png?v=56',
+  '/zivifactura-app-512-v56.svg?v=56',
 ]
+
+async function cacheCurrentBuild(cache) {
+  try {
+    const response = await fetch(new Request('/', { cache: 'reload' }))
+    if (!response.ok) return
+
+    const cachedResponse = response.clone()
+    const html = await response.text()
+    await cache.put('/', cachedResponse)
+
+    const assets = [...html.matchAll(/(?:src|href)=["']([^"'#]+)["']/g)]
+      .map(match => match[1])
+      .filter(url => url.startsWith('/assets/') || url.startsWith('/src/'))
+
+    await Promise.allSettled(
+      [...new Set(assets)].map(url => cache.add(new Request(url, { cache: 'reload' }))),
+    )
+  } catch (_) {
+    // A failed pre-cache must not make installation fail.
+  }
+}
 
 self.addEventListener('install', event => {
   self.skipWaiting()
-  event.waitUntil(
-    caches.open(CACHE).then(async cache => {
-      for (const url of APP_SHELL) {
-        try { await cache.add(new Request(url, { cache: 'reload' })) } catch (_) {}
-      }
-    }),
-  )
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE)
+    await cacheCurrentBuild(cache)
+    await Promise.allSettled(
+      APP_SHELL.map(url => cache.add(new Request(url, { cache: 'reload' }))),
+    )
+  })())
 })
 
 self.addEventListener('activate', event => {
@@ -46,7 +66,7 @@ self.addEventListener('fetch', event => {
   event.respondWith((async () => {
     try {
       const fresh = await fetch(request)
-      if (fresh && fresh.ok && fresh.type === 'basic') {
+      if (fresh && fresh.ok && (fresh.type === 'basic' || fresh.type === 'cors')) {
         const cache = await caches.open(CACHE)
         cache.put(request, fresh.clone()).catch(() => undefined)
       }

@@ -36,9 +36,11 @@ type PwaWindow = Window & {
 }
 
 const pwaWindow = window as PwaWindow
-const PWA_RESET_KEY = 'zivifactura.pwa-reset-v41'
-
-installOperationalReadGuards()
+try {
+  installOperationalReadGuards()
+} catch (error) {
+  console.warn('[ZiviFactura] read guards no disponibles al iniciar:', error)
+}
 
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault()
@@ -51,35 +53,6 @@ window.addEventListener('appinstalled', () => {
   window.dispatchEvent(new Event('zivi-installed'))
 })
 
-async function resetLegacyPwaOnce() {
-  if (!('serviceWorker' in navigator)) return
-  if (localStorage.getItem(PWA_RESET_KEY) === '1') return
-
-  try {
-    const registrations = await navigator.serviceWorker.getRegistrations()
-    await Promise.all(
-      registrations
-        .filter(registration => registration.scope.startsWith(window.location.origin))
-        .map(registration => registration.unregister()),
-    )
-
-    if ('caches' in window) {
-      const keys = await caches.keys()
-      await Promise.all(
-        keys
-          .filter(key => /workbox|precache|zivifactura/i.test(key))
-          .map(key => caches.delete(key)),
-      )
-    }
-  } catch (error) {
-    console.warn('[ZiviFactura] legacy PWA cleanup:', error)
-  } finally {
-    // Este marcador solo afecta Service Workers y Cache Storage. No se toca
-    // IndexedDB ni los datos locales de facturas, clientes o cobros.
-    localStorage.setItem(PWA_RESET_KEY, '1')
-  }
-}
-
 async function registerPwaServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     pwaWindow.__ziviSwReady = false
@@ -89,15 +62,17 @@ async function registerPwaServiceWorker() {
   }
 
   try {
-    await resetLegacyPwaOnce()
-
-    const registration = await navigator.serviceWorker.register('/sw.js', {
+    // Service Worker is an enhancement, never a prerequisite for rendering.
+    // Reuse an existing registration when the browser exposes one and do not
+    // unregister workers during startup: some Android standalone contexts can
+    // deny a fresh registration even though normal web execution is allowed.
+    const existing = await navigator.serviceWorker.getRegistration('/').catch(() => undefined)
+    const registration = existing || await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
       updateViaCache: 'none',
     })
 
-    await registration.update().catch(() => undefined)
-    await navigator.serviceWorker.ready
+    void registration.update().catch(() => undefined)
 
     pwaWindow.__ziviSwReady = true
     pwaWindow.__ziviSwError = ''
@@ -132,13 +107,11 @@ async function upgradeBusinessProfileModules() {
   }
 }
 
-async function bootstrap() {
-  await dedupeStoredClients().catch(error => console.warn('[ZiviFactura] client cleanup:', error))
-  await upgradeBusinessProfileModules().catch(error => console.warn('[ZiviFactura] business profile migration:', error))
-  startClientDedupWatcher()
-  initAutomaticBackup()
+function mountApp() {
+  const root = document.getElementById('root')
+  if (!root) throw new Error('No se encontró el contenedor principal de ZiviFactura.')
 
-  ReactDOM.createRoot(document.getElementById('root')!).render(
+  ReactDOM.createRoot(root).render(
     <React.StrictMode>
       <AuthShellV2 />
       <ZiviChrome />
@@ -150,4 +123,26 @@ async function bootstrap() {
   )
 }
 
-void bootstrap()
+async function runMaintenanceInBackground() {
+  try {
+    startClientDedupWatcher()
+    initAutomaticBackup()
+  } catch (error) {
+    console.warn('[ZiviFactura] servicios secundarios no disponibles al iniciar:', error)
+  }
+
+  await dedupeStoredClients().catch(error => console.warn('[ZiviFactura] client cleanup:', error))
+  await upgradeBusinessProfileModules().catch(error => console.warn('[ZiviFactura] business profile migration:', error))
+}
+
+// Paint the interface first. IndexedDB migrations, cleanup and PWA services
+// must never be able to leave a fresh installation on a blank screen.
+try {
+  mountApp()
+} catch (error) {
+  console.error('[ZiviFactura] fallo crítico de montaje:', error)
+  const root = document.getElementById('root')
+  if (root) root.setAttribute('data-boot-error', '1')
+}
+
+void runMaintenanceInBackground()
