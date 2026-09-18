@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from './db'
 import { firebaseAuth, firestore } from './firebase'
 import { money, totals } from './pdf'
@@ -9,15 +9,21 @@ function shareId() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
 }
 
-function encodeCopyPayload(payload: unknown) {
+function encodePayload(payload: unknown) {
   const bytes = new TextEncoder().encode(JSON.stringify(payload))
   let binary = ''
   bytes.forEach(byte => { binary += String.fromCharCode(byte) })
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
-function localDocumentUrl(payload: unknown) {
-  return `${window.location.origin}/copiar.html#${encodeCopyPayload(payload)}`
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), ms)
+    promise.then(
+      value => { window.clearTimeout(timer); resolve(value) },
+      error => { window.clearTimeout(timer); reject(error) },
+    )
+  })
 }
 
 function availablePaymentMethods(company: Company): PaymentDisplay[] {
@@ -101,43 +107,58 @@ function buildPublicPayload(invoice: Invoice, company: Company, ownerUid = 'loca
   }
 }
 
-export async function publishPublicDocument(invoice: Invoice, company: Company) {
+export type PreparedPublicShare = {
+  id: string
+  url: string
+  total: number
+  payload: ReturnType<typeof buildPublicPayload>
+}
+
+export function preparePublicDocumentShare(invoice: Invoice, company: Company): PreparedPublicShare {
   if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo por enlace.')
 
   const user = firebaseAuth?.currentUser || null
-  const id = invoice.publicShareId && !invoice.publicShareId.startsWith('local-') ? invoice.publicShareId : shareId()
+  const existing = invoice.publicShareId || ''
+  const cloudId = existing && !existing.startsWith('local-') ? existing : shareId()
+  const id = user ? cloudId : (existing.startsWith('local-') ? existing : `local-${cloudId}`)
   const payload = buildPublicPayload(invoice, company, user?.uid || 'local')
+  const url = `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}#p=${encodePayload({
+    ...payload,
+    publicShareId: id,
+    shareId: id,
+  })}`
 
-  if (firestore && user) {
-    const url = `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`
-    const publicRef = doc(firestore, 'publicDocuments', id)
-
-    // El enlace solo se entrega cuando Firestore confirma que el documento existe.
-    // Antes se compartía inmediatamente y el cliente podía abrirlo antes de que
-    // terminara setDoc(), provocando falsos "enlace no disponible" en Android/WhatsApp.
-    try {
-      await setDoc(publicRef, { ...payload, updatedAt: serverTimestamp() }, { merge: true })
-      const published = await getDoc(publicRef)
-      if (!published.exists() || published.data()?.active === false) {
-        throw new Error('El documento público no quedó disponible después de publicarlo.')
-      }
-
-      if (!invoice.publicShareId || invoice.publicShareId.startsWith('local-')) {
-        await db.invoices.update(invoice.id!, { publicShareId: id, updatedAt: new Date().toISOString() })
-      }
-    } catch (error) {
-      console.error('[ZiviFactura] no se pudo publicar el enlace:', error)
-      throw new Error('No pudimos publicar el enlace todavía. Verifica tu conexión e inténtalo nuevamente.')
-    }
-
-    return { id, url, total: payload.total }
+  if (invoice.id && invoice.publicShareId !== id) {
+    void db.invoices.update(invoice.id, { publicShareId: id, updatedAt: new Date().toISOString() })
+      .catch(error => console.warn('[ZiviFactura] no se pudo guardar el id público localmente:', error))
   }
 
-  return {
-    id: `local-${id}`,
-    url: localDocumentUrl({ ...payload, ownerUid: 'local', localOnly: true, publicShareId: id }),
-    total: payload.total,
+  return { id, url, total: payload.total, payload }
+}
+
+export async function publishPublicDocument(
+  invoice: Invoice,
+  company: Company,
+  prepared?: PreparedPublicShare,
+) {
+  const shared = prepared || preparePublicDocumentShare(invoice, company)
+  const user = firebaseAuth?.currentUser || null
+
+  if (!firestore || !user || shared.id.startsWith('local-')) return shared
+
+  const publicRef = doc(firestore, 'publicDocuments', shared.id)
+  try {
+    await withTimeout(
+      setDoc(publicRef, { ...shared.payload, updatedAt: serverTimestamp() }, { merge: true }),
+      15000,
+      'Firebase tardó demasiado publicando el documento.',
+    )
+  } catch (error) {
+    console.warn('[ZiviFactura] publicación remota pendiente/fallida:', error)
+    throw new Error('El enlace se creó, pero Firebase no terminó de sincronizarlo. El cliente todavía podrá abrir la copia incluida en el enlace.')
   }
+
+  return shared
 }
 
 export function shareDocumentMessage(invoice: Invoice, url: string, total = totals(invoice).total) {
