@@ -40,11 +40,11 @@ function publicCompany(company: Company) {
     id: company.id,
     syncId: company.syncId || '',
     name: company.name,
-    taxId: company.taxId,
-    phone: company.phone,
-    email: company.email,
-    address: company.address,
-    city: company.city,
+    taxId: company.taxId || '',
+    phone: company.phone || '',
+    email: company.email || '',
+    address: company.address || '',
+    city: company.city || '',
     mobilePaymentBank: company.mobilePaymentBank || '',
     mobilePaymentPhone: company.mobilePaymentPhone || '',
     mobilePaymentId: company.mobilePaymentId || '',
@@ -80,7 +80,7 @@ function buildPublicPayload(invoice: Invoice, company: Company, ownerUid = 'loca
     subtotal: documentTotals.subtotal,
     discount: documentTotals.discount,
     tax: documentTotals.tax,
-    taxRate: invoice.taxRate,
+    taxRate: Number(invoice.taxRate) || 0,
     total: documentTotals.total,
     client: {
       name: invoice.client.name || 'Cliente',
@@ -90,7 +90,7 @@ function buildPublicPayload(invoice: Invoice, company: Company, ownerUid = 'loca
       address: invoice.client.address || '',
     },
     items: invoice.items.map(item => ({
-      id: item.id,
+      id: item.id || '',
       description: item.description,
       quantity: Number(item.quantity) || 0,
       unitPrice: Number(item.unitPrice) || 0,
@@ -150,17 +150,36 @@ export async function publishPublicDocument(
 
   const publicRef = doc(firestore, 'publicDocuments', shared.id)
   try {
+    // JSON round-trip strips every undefined value before it reaches Firestore.
+    // Firestore rejects an entire write if even one optional field is undefined.
+    const safePayload = JSON.parse(JSON.stringify(shared.payload))
     await withTimeout(
-      setDoc(publicRef, { ...shared.payload, updatedAt: serverTimestamp() }, { merge: true }),
+      setDoc(publicRef, { ...safePayload, updatedAt: serverTimestamp() }, { merge: true }),
       15000,
       'Firebase tardó demasiado publicando el documento.',
     )
-  } catch (error) {
-    console.warn('[ZiviFactura] publicación remota pendiente/fallida:', error)
-    throw new Error('El enlace se creó, pero Firebase no terminó de sincronizarlo. El cliente todavía podrá abrir la copia incluida en el enlace.')
-  }
 
-  return shared
+    const publishedAt = new Date().toISOString()
+    if (invoice.id) {
+      await db.invoices.update(invoice.id, {
+        publicShareId: shared.id,
+        publicShareReadyAt: publishedAt,
+        updatedAt: invoice.updatedAt || publishedAt,
+      })
+    }
+    return { ...shared, publishedAt }
+  } catch (error) {
+    const code = (error as { code?: string })?.code || ''
+    const detail = error instanceof Error ? error.message : String(error || '')
+    console.warn('[ZiviFactura] publicación remota fallida:', code, detail, error)
+    if (code === 'permission-denied') {
+      throw new Error('Firebase rechazó la publicación del documento. Deben revisarse las reglas de Firestore.')
+    }
+    if (code === 'unavailable' || code === 'network-request-failed') {
+      throw new Error('No hubo conexión con Firebase para publicar el documento.')
+    }
+    throw new Error(detail || 'No se pudo publicar el documento en Firebase.')
+  }
 }
 
 export function shareDocumentMessage(invoice: Invoice, url: string, total = totals(invoice).total) {
