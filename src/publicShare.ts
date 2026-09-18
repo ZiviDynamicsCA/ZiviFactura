@@ -142,7 +142,7 @@ export async function publishPublicDocument(
   invoice: Invoice,
   company: Company,
   prepared?: PreparedPublicShare,
-) {
+): Promise<PreparedPublicShare & { publishedAt?: string }> {
   const shared = prepared || preparePublicDocumentShare(invoice, company)
   const user = firebaseAuth?.currentUser || null
 
