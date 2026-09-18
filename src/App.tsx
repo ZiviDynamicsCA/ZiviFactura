@@ -318,40 +318,145 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
   }
 
   const download = () => buildInvoicePdf(invoice, company).save(`${invoice.number}.pdf`)
+
+  function existingPublicShare() {
+    const id = invoice.publicShareId
+    if (!id || id.startsWith('local-')) return null
+    return {
+      id,
+      url: `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`,
+      total: sum.total,
+    }
+  }
+
+  async function copyTextSafe(text: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+        return
+      }
+    } catch { /* use legacy fallback below */ }
+    const area = document.createElement('textarea')
+    area.value = text
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    area.style.pointerEvents = 'none'
+    document.body.appendChild(area)
+    area.focus()
+    area.select()
+    const copied = document.execCommand('copy')
+    area.remove()
+    if (!copied) throw new Error('No se pudo copiar automáticamente. Mantén pulsado el enlace para copiarlo.')
+  }
+
   async function prepareLink() {
     if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo.')
     const shared = await publishPublicDocument(invoice, company)
     setInvoice(current => ({ ...current, publicShareId: shared.id }))
     return shared
   }
+
   const share = async () => {
     if (!invoice.client.name.trim()) return notify('Completa el cliente antes de compartir.')
+
+    const ready = existingPublicShare()
+    if (ready) {
+      const message = shareDocumentMessage(invoice, ready.url, ready.total)
+      void publishPublicDocument(invoice, company).catch(() => undefined)
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: `${invoice.type} ${invoice.number}`, text: message, url: ready.url })
+          return
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') return
+        }
+      }
+      try {
+        await copyTextSafe(message)
+        notify('Enlace copiado. Ya puedes enviarlo al cliente.')
+      } catch (error) {
+        notify(error instanceof Error ? error.message : 'No se pudo copiar el enlace.')
+      }
+      return
+    }
+
     try {
+      notify('Preparando enlace seguro…')
       const shared = await prepareLink()
       const message = shareDocumentMessage(invoice, shared.url, shared.total)
       if (navigator.share) {
-        try { await navigator.share({ title: `${invoice.type} ${invoice.number}`, text: message, url: shared.url }); return } catch (error) { if (error instanceof DOMException && error.name === 'AbortError') return }
+        try {
+          await navigator.share({ title: `${invoice.type} ${invoice.number}`, text: message, url: shared.url })
+          return
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') return
+        }
       }
-      await navigator.clipboard?.writeText(message)
-      notify('Enlace copiado. Ya puedes enviarlo al cliente.')
-    } catch (error) { notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.') }
+      await copyTextSafe(message)
+      notify('Enlace preparado y copiado. Ya puedes enviarlo.')
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.')
+    }
   }
+
   const whatsapp = async () => {
     if (!invoice.client.name.trim()) return notify('Completa el cliente antes de compartir.')
+
+    const phone = invoice.client.phone.replace(/\D/g, '')
+    const go = (url: string, total: number, popup?: Window | null) => {
+      const message = shareDocumentMessage(invoice, url, total)
+      const target = phone
+        ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+        : `https://wa.me/?text=${encodeURIComponent(message)}`
+      if (popup && !popup.closed) {
+        popup.location.href = target
+      } else {
+        window.location.href = target
+      }
+    }
+
+    const ready = existingPublicShare()
+    if (ready) {
+      void publishPublicDocument(invoice, company).catch(() => undefined)
+      go(ready.url, ready.total)
+      return
+    }
+
+    // Open the target window synchronously while the tap still has user activation.
+    // Android may block window.open/navigator.share after awaiting Firestore.
+    const popup = window.open('about:blank', '_blank')
     try {
+      notify('Preparando enlace para WhatsApp…')
       const shared = await prepareLink()
-      const message = shareDocumentMessage(invoice, shared.url, shared.total)
-      const phone = invoice.client.phone.replace(/\D/g, '')
-      window.open(phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : `https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
-    } catch (error) { notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.') }
+      go(shared.url, shared.total, popup)
+    } catch (error) {
+      try { popup?.close() } catch { /* ignore */ }
+      notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.')
+    }
   }
+
   const email = async () => {
     if (!invoice.client.email.trim()) return notify('Agrega el correo del cliente antes de preparar el correo.')
+
+    const openMail = (url: string, total: number) => {
+      const message = shareDocumentMessage(invoice, url, total)
+      window.location.href = `mailto:${invoice.client.email}?subject=${encodeURIComponent(`${invoice.type} ${invoice.number}`)}&body=${encodeURIComponent(`${message}\n\nSaludos.`)}`
+    }
+
+    const ready = existingPublicShare()
+    if (ready) {
+      void publishPublicDocument(invoice, company).catch(() => undefined)
+      openMail(ready.url, ready.total)
+      return
+    }
+
     try {
+      notify('Preparando enlace para correo…')
       const shared = await prepareLink()
-      const message = shareDocumentMessage(invoice, shared.url, shared.total)
-      location.href = `mailto:${invoice.client.email}?subject=${encodeURIComponent(`${invoice.type} ${invoice.number}`)}&body=${encodeURIComponent(`${message}\n\nSaludos.`)}`
-    } catch (error) { notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.') }
+      openMail(shared.url, shared.total)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.')
+    }
   }
 
   const conversionOptions: Array<{ key: ConversionTarget; label: string }> = [
