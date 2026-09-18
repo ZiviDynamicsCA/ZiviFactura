@@ -121,6 +121,13 @@ function mountApp() {
       <InstallPrompt />
     </React.StrictMode>,
   )
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      const marker = window as Window & { __ziviBootOk?: () => void }
+      marker.__ziviBootOk?.()
+    })
+  })
 }
 
 async function runMaintenanceInBackground() {
@@ -143,6 +150,8 @@ try {
   console.error('[ZiviFactura] fallo crítico de montaje:', error)
   const root = document.getElementById('root')
   if (root) root.setAttribute('data-boot-error', '1')
+  const marker = window as Window & { __ziviShowBootError?: (label: string, error: unknown) => void }
+  marker.__ziviShowBootError?.('ZiviFactura no pudo montar la interfaz', error)
 }
 
 void runMaintenanceInBackground()
