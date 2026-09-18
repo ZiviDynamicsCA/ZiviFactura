@@ -140,7 +140,7 @@ export default function App() {
   const edit = (i: Invoice) => { setEditing(structuredClone(i)); setMode('editor') }
   const duplicate = (i: Invoice) => {
     const now = new Date().toISOString()
-    setEditing({ ...structuredClone(i), id: undefined, companyId: company.id, publicShareId: undefined, number: numberFor(company), status: 'draft', date: today(), createdAt: now, updatedAt: now, items: i.items.map(x => ({ ...x, id: uid() })) })
+    setEditing({ ...structuredClone(i), id: undefined, companyId: company.id, publicShareId: undefined, publicShareReadyAt: undefined, number: numberFor(company), status: 'draft', date: today(), createdAt: now, updatedAt: now, items: i.items.map(x => ({ ...x, id: uid() })) })
     setMode('editor')
   }
   const remove = async (i: Invoice) => {
@@ -246,6 +246,34 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
   const selectedPayments = invoice.paymentMethodsVisible ?? availablePayments
   useEffect(() => setInvoice(initial), [initial])
   useEffect(() => { if (!rates) void refreshRatesIfDue().then(next => next && setRates(next)) }, [rates])
+
+  useEffect(() => {
+    if (!initial.id || initial.status === 'draft' || initial.publicShareReadyAt) return
+    let cancelled = false
+    try {
+      const shared = preparePublicDocumentShare(initial, company)
+      const source: Invoice = { ...initial, publicShareId: shared.id }
+      void publishPublicDocument(source, company, shared)
+        .then(async published => {
+          if (cancelled || !published.publishedAt) return
+          const ready: Invoice = {
+            ...source,
+            publicShareId: published.id,
+            publicShareReadyAt: published.publishedAt,
+          }
+          await db.invoices.put(ready)
+          if (!cancelled) {
+            setInvoice(current => current.id === ready.id
+              ? { ...current, publicShareId: ready.publicShareId, publicShareReadyAt: ready.publicShareReadyAt }
+              : current)
+          }
+        })
+        .catch(error => console.warn('[ZiviFactura] reparación de enlace público pendiente:', error))
+    } catch (error) {
+      console.warn('[ZiviFactura] no se pudo preparar reparación de enlace:', error)
+    }
+    return () => { cancelled = true }
+  }, [initial.id, initial.updatedAt, initial.publicShareReadyAt, initial.status, company.id])
   const set = <K extends keyof Invoice>(k: K, v: Invoice[K]) => setInvoice(p => ({ ...p, [k]: v }))
   const setClient = (k: keyof Invoice['client'], v: string) => setInvoice(p => ({ ...p, client: { ...p.client, [k]: v } }))
   const setItem = (id: string, patch: Partial<InvoiceItem>) => setInvoice(p => ({ ...p, items: p.items.map(x => x.id === id ? { ...x, ...patch } : x) }))
