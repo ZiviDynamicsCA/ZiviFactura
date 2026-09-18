@@ -95,6 +95,7 @@ export interface Invoice {
   technicalDuplicateHiddenAt?: string
   technicalDuplicateSignature?: string
   publicShareId?: string
+  publicShareReadyAt?: string
   number: string
   type: InvoiceType
   status: InvoiceStatus
