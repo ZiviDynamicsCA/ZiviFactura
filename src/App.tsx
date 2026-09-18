@@ -140,7 +140,7 @@ export default function App() {
   const edit = (i: Invoice) => { setEditing(structuredClone(i)); setMode('editor') }
   const duplicate = (i: Invoice) => {
     const now = new Date().toISOString()
-    setEditing({ ...structuredClone(i), id: undefined, companyId: company.id, publicShareId: undefined, number: numberFor(company), status: 'draft', date: today(), createdAt: now, updatedAt: now, items: i.items.map(x => ({ ...x, id: uid() })) })
+    setEditing({ ...structuredClone(i), id: undefined, companyId: company.id, publicShareId: undefined, publicShareReadyAt: undefined, number: numberFor(company), status: 'draft', date: today(), createdAt: now, updatedAt: now, items: i.items.map(x => ({ ...x, id: uid() })) })
     setMode('editor')
   }
   const remove = async (i: Invoice) => {
@@ -246,6 +246,34 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
   const selectedPayments = invoice.paymentMethodsVisible ?? availablePayments
   useEffect(() => setInvoice(initial), [initial])
   useEffect(() => { if (!rates) void refreshRatesIfDue().then(next => next && setRates(next)) }, [rates])
+
+  useEffect(() => {
+    if (!initial.id || initial.status === 'draft' || initial.publicShareReadyAt) return
+    let cancelled = false
+    try {
+      const shared = preparePublicDocumentShare(initial, company)
+      const source: Invoice = { ...initial, publicShareId: shared.id }
+      void publishPublicDocument(source, company, shared)
+        .then(async published => {
+          if (cancelled || !published.publishedAt) return
+          const ready: Invoice = {
+            ...source,
+            publicShareId: published.id,
+            publicShareReadyAt: published.publishedAt,
+          }
+          await db.invoices.put(ready)
+          if (!cancelled) {
+            setInvoice(current => current.id === ready.id
+              ? { ...current, publicShareId: ready.publicShareId, publicShareReadyAt: ready.publicShareReadyAt }
+              : current)
+          }
+        })
+        .catch(error => console.warn('[ZiviFactura] reparación de enlace público pendiente:', error))
+    } catch (error) {
+      console.warn('[ZiviFactura] no se pudo preparar reparación de enlace:', error)
+    }
+    return () => { cancelled = true }
+  }, [initial.id, initial.updatedAt, initial.publicShareReadyAt, initial.status, company.id])
   const set = <K extends keyof Invoice>(k: K, v: Invoice[K]) => setInvoice(p => ({ ...p, [k]: v }))
   const setClient = (k: keyof Invoice['client'], v: string) => setInvoice(p => ({ ...p, client: { ...p.client, [k]: v } }))
   const setItem = (id: string, patch: Partial<InvoiceItem>) => setInvoice(p => ({ ...p, items: p.items.map(x => x.id === id ? { ...x, ...patch } : x) }))
@@ -306,59 +334,90 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
       if (!existing) existing = clients.find(c => c.name.toLowerCase() === invoice.client.name.trim().toLowerCase())
       const clientPayload: Client = { ...invoice.client, companyId: company.id, id: existing?.id, createdAt: existing?.createdAt || new Date().toISOString() }
       const clientId = existing?.id ? (await db.clients.put(clientPayload), existing.id) : Number(await db.clients.add(clientPayload))
-      const payload: Invoice = { ...invoice, companyId: company.id, clientId, status: status ?? invoice.status, items: validItems, updatedAt: new Date().toISOString() }
+      const payload: Invoice = {
+        ...invoice,
+        companyId: company.id,
+        clientId,
+        status: status ?? invoice.status,
+        items: validItems,
+        updatedAt: new Date().toISOString(),
+        publicShareReadyAt: undefined,
+      }
+
       let id = invoice.id
       if (id) await db.invoices.put(payload)
-      else { id = Number(await db.invoices.add(payload)); await db.company.update(company.id, { nextInvoiceNumber: (company.nextInvoiceNumber || 1) + 1 }) }
-      const saved = { ...payload, id }
-      let finalSaved = saved
+      else {
+        id = Number(await db.invoices.add(payload))
+        await db.company.update(company.id, { nextInvoiceNumber: (company.nextInvoiceNumber || 1) + 1 })
+      }
 
-      // Give every saved cloud document its public ID immediately and start
-      // publication before the user reaches WhatsApp/email/share. This keeps
-      // shared URLs short without reintroducing a blocking Firestore wait.
-      try {
-        const shared = preparePublicDocumentShare(saved, company)
-        finalSaved = { ...saved, publicShareId: shared.id }
-        await db.invoices.put(finalSaved)
-        void publishPublicDocument(finalSaved, company, shared)
-          .catch(error => console.warn('[ZiviFactura] publicación anticipada pendiente:', error))
-      } catch (error) {
-        console.warn('[ZiviFactura] no se pudo preparar publicación anticipada:', error)
+      let finalSaved: Invoice = { ...payload, id }
+
+      // Issued documents must be confirmed in Firestore before we call their
+      // short public URL "ready". This prevents WhatsApp from receiving a link
+      // to a document that does not exist yet.
+      if (finalSaved.status !== 'draft' || finalSaved.publicShareId) {
+        try {
+          const shared = preparePublicDocumentShare(finalSaved, company)
+          finalSaved = { ...finalSaved, publicShareId: shared.id }
+          await db.invoices.put(finalSaved)
+          const published = await publishPublicDocument(finalSaved, company, shared)
+          finalSaved = {
+            ...finalSaved,
+            publicShareId: published.id,
+            publicShareReadyAt: published.publishedAt,
+          }
+          await db.invoices.put(finalSaved)
+        } catch (error) {
+          console.error('[ZiviFactura] publicación al guardar:', error)
+          notify(error instanceof Error
+            ? `Documento guardado, pero el enlace público no quedó listo: ${error.message}`
+            : 'Documento guardado, pero el enlace público no quedó listo.')
+        }
       }
 
       setInvoice(finalSaved)
       onSaved(finalSaved)
-    } finally { setSaving(false) }
-  }
-
-  function prepareInstantLink() {
-    if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo.')
-    const shared = preparePublicDocumentShare(invoice, company)
-    const source = { ...invoice, publicShareId: shared.id }
-    setInvoice(source)
-
-    // Cloud publication is intentionally background-only. The URL already carries
-    // a self-contained fallback copy of the document, so Android sharing never
-    // waits for Firestore and never loses the original tap/user activation.
-    void publishPublicDocument(source, company, shared)
-      .catch(error => console.warn('[ZiviFactura] publicación en segundo plano:', error))
-
-    return shared
-  }
-
-  const download = () => {
-    let source = invoice
-    let publicUrl = ''
-    if (invoice.id) {
-      try {
-        const shared = prepareInstantLink()
-        source = { ...invoice, publicShareId: shared.id }
-        publicUrl = shared.url
-      } catch (error) {
-        notify(error instanceof Error ? error.message : 'No se pudo preparar el enlace del PDF.')
-      }
+    } finally {
+      setSaving(false)
     }
-    buildInvoicePdf(source, company, publicUrl).save(`${invoice.number}.pdf`)
+  }
+
+  async function ensurePublishedLink() {
+    if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo.')
+
+    const shared = preparePublicDocumentShare(invoice, company)
+    if (
+      invoice.publicShareReadyAt
+      && invoice.publicShareId === shared.id
+      && !shared.id.startsWith('local-')
+    ) {
+      return shared
+    }
+
+    notify('Publicando enlace seguro…')
+    const source: Invoice = { ...invoice, publicShareId: shared.id }
+    const published = await publishPublicDocument(source, company, shared)
+    const ready: Invoice = {
+      ...source,
+      publicShareId: published.id,
+      publicShareReadyAt: published.publishedAt,
+    }
+    setInvoice(ready)
+    if (ready.id) await db.invoices.put(ready)
+    return published
+  }
+
+  const download = async () => {
+    try {
+      const shared = invoice.id ? await ensurePublishedLink() : null
+      const source = shared
+        ? { ...invoice, publicShareId: shared.id, publicShareReadyAt: shared.publishedAt }
+        : invoice
+      buildInvoicePdf(source, company, shared?.url || '').save(`${invoice.number}.pdf`)
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No se pudo preparar el enlace del PDF.')
+    }
   }
 
   async function copyTextSafe(text: string) {
@@ -368,6 +427,7 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
         return
       }
     } catch { /* use legacy fallback below */ }
+
     const area = document.createElement('textarea')
     area.value = text
     area.style.position = 'fixed'
@@ -384,14 +444,14 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
   const share = async () => {
     if (!invoice.client.name.trim()) return notify('Completa el cliente antes de compartir.')
     try {
-      const shared = prepareInstantLink()
-      const message = shareDocumentMessage(invoice, shared.url, shared.total)
+      const shared = await ensurePublishedLink()
+      const nativeText = shareDocumentMessage(invoice, shared.url, shared.total, false)
 
       if (navigator.share) {
         try {
           await navigator.share({
             title: `${invoice.type} ${invoice.number}`,
-            text: message,
+            text: nativeText,
             url: shared.url,
           })
           return
@@ -400,34 +460,32 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
         }
       }
 
-      await copyTextSafe(message)
+      await copyTextSafe(shareDocumentMessage(invoice, shared.url, shared.total))
       notify('Enlace copiado. Ya puedes enviarlo al cliente.')
     } catch (error) {
       notify(error instanceof Error ? error.message : 'No se pudo compartir el enlace.')
     }
   }
 
-  const whatsapp = () => {
+  const whatsapp = async () => {
     if (!invoice.client.name.trim()) return notify('Completa el cliente antes de compartir.')
     try {
-      const shared = prepareInstantLink()
+      const shared = await ensurePublishedLink()
       const message = shareDocumentMessage(invoice, shared.url, shared.total)
       const phone = invoice.client.phone.replace(/\D/g, '')
       const target = phone
         ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
         : `https://wa.me/?text=${encodeURIComponent(message)}`
-
-      // Navigation happens synchronously in the same tap; no about:blank bridge.
       window.location.href = target
     } catch (error) {
       notify(error instanceof Error ? error.message : 'No se pudo preparar WhatsApp.')
     }
   }
 
-  const email = () => {
+  const email = async () => {
     if (!invoice.client.email.trim()) return notify('Agrega el correo del cliente antes de preparar el correo.')
     try {
-      const shared = prepareInstantLink()
+      const shared = await ensurePublishedLink()
       const message = shareDocumentMessage(invoice, shared.url, shared.total)
       window.location.href = `mailto:${invoice.client.email}?subject=${encodeURIComponent(`${invoice.type} ${invoice.number}`)}&body=${encodeURIComponent(`${message}\n\nSaludos.`)}`
     } catch (error) {
