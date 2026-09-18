@@ -1,8 +1,8 @@
-const CACHE = 'zivifactura-shell-v59'
+const CACHE = 'zivifactura-shell-v60'
 const APP_SHELL = [
-  '/manifest.webmanifest?v=59',
-  '/zivifactura-app-192-v43.png?v=59',
-  '/zivifactura-app-512-v56.svg?v=59',
+  '/manifest.webmanifest?v=60',
+  '/zivifactura-app-192-v43.png?v=60',
+  '/zivifactura-app-512-v56.svg?v=60',
 ]
 
 async function cacheCurrentBuild(cache) {
