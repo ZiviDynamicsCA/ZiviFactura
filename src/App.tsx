@@ -4,7 +4,7 @@ import { db, defaultCompany, ensureCompany, exportBackup, importBackup } from '.
 import { buildInvoicePdf, money, totals } from './pdf'
 import { appliedForInvoice, balanceForInvoice } from './payments'
 import { getActiveCompanyId } from './companyScope'
-import { publishPublicDocument, shareDocumentMessage } from './publicShare'
+import { preparePublicDocumentShare, publishPublicDocument, shareDocumentMessage } from './publicShare'
 import RatesView from './RatesView'
 import { fetchLiveRates, formatRate, getCachedRates, getRateValue, invoiceEquivalentValues, rateSourceLabels, refreshRatesIfDue } from './rates'
 import type { BackupData, Client, Company, ConversionTarget, Invoice, InvoiceItem, InvoiceStatus, Payment, PaymentDisplay, RateSnapshot, RateSource } from './types'
@@ -317,28 +317,32 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
     } finally { setSaving(false) }
   }
 
-  const download = async () => {
+  function prepareInstantLink() {
+    if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo.')
+    const shared = preparePublicDocumentShare(invoice, company)
+    const source = { ...invoice, publicShareId: shared.id }
+    setInvoice(source)
+
+    // Cloud publication is intentionally background-only. The URL already carries
+    // a self-contained fallback copy of the document, so Android sharing never
+    // waits for Firestore and never loses the original tap/user activation.
+    void publishPublicDocument(source, company, shared)
+      .catch(error => console.warn('[ZiviFactura] publicación en segundo plano:', error))
+
+    return shared
+  }
+
+  const download = () => {
     let source = invoice
     if (invoice.id) {
       try {
-        const shared = await prepareLink()
+        const shared = prepareInstantLink()
         source = { ...invoice, publicShareId: shared.id }
       } catch (error) {
-        // PDF generation remains available even if the cloud link cannot be refreshed.
-        notify(error instanceof Error ? `${error.message} El PDF se generará igualmente.` : 'No se pudo actualizar el enlace; el PDF se generará igualmente.')
+        notify(error instanceof Error ? error.message : 'No se pudo preparar el enlace del PDF.')
       }
     }
     buildInvoicePdf(source, company).save(`${invoice.number}.pdf`)
-  }
-
-  function existingPublicShare() {
-    const id = invoice.publicShareId
-    if (!id || id.startsWith('local-')) return null
-    return {
-      id,
-      url: `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`,
-      total: sum.total,
-    }
   }
 
   async function copyTextSafe(text: string) {
@@ -361,113 +365,57 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
     if (!copied) throw new Error('No se pudo copiar automáticamente. Mantén pulsado el enlace para copiarlo.')
   }
 
-  async function prepareLink() {
-    if (!invoice.id) throw new Error('Guarda el documento antes de compartirlo.')
-    const shared = await publishPublicDocument(invoice, company)
-    setInvoice(current => ({ ...current, publicShareId: shared.id }))
-    return shared
-  }
-
   const share = async () => {
     if (!invoice.client.name.trim()) return notify('Completa el cliente antes de compartir.')
-
-    const ready = existingPublicShare()
-    if (ready) {
-      const message = shareDocumentMessage(invoice, ready.url, ready.total)
-      void publishPublicDocument(invoice, company).catch(() => undefined)
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: `${invoice.type} ${invoice.number}`, text: message, url: ready.url })
-          return
-        } catch (error) {
-          if (error instanceof DOMException && error.name === 'AbortError') return
-        }
-      }
-      try {
-        await copyTextSafe(message)
-        notify('Enlace copiado. Ya puedes enviarlo al cliente.')
-      } catch (error) {
-        notify(error instanceof Error ? error.message : 'No se pudo copiar el enlace.')
-      }
-      return
-    }
-
     try {
-      notify('Preparando enlace seguro…')
-      const shared = await prepareLink()
+      const shared = prepareInstantLink()
       const message = shareDocumentMessage(invoice, shared.url, shared.total)
+
       if (navigator.share) {
         try {
-          await navigator.share({ title: `${invoice.type} ${invoice.number}`, text: message, url: shared.url })
+          await navigator.share({
+            title: `${invoice.type} ${invoice.number}`,
+            text: message,
+            url: shared.url,
+          })
           return
         } catch (error) {
           if (error instanceof DOMException && error.name === 'AbortError') return
         }
       }
+
       await copyTextSafe(message)
-      notify('Enlace preparado y copiado. Ya puedes enviarlo.')
+      notify('Enlace copiado. Ya puedes enviarlo al cliente.')
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.')
+      notify(error instanceof Error ? error.message : 'No se pudo compartir el enlace.')
     }
   }
 
-  const whatsapp = async () => {
+  const whatsapp = () => {
     if (!invoice.client.name.trim()) return notify('Completa el cliente antes de compartir.')
-
-    const phone = invoice.client.phone.replace(/\D/g, '')
-    const go = (url: string, total: number, popup?: Window | null) => {
-      const message = shareDocumentMessage(invoice, url, total)
+    try {
+      const shared = prepareInstantLink()
+      const message = shareDocumentMessage(invoice, shared.url, shared.total)
+      const phone = invoice.client.phone.replace(/\D/g, '')
       const target = phone
         ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
         : `https://wa.me/?text=${encodeURIComponent(message)}`
-      if (popup && !popup.closed) {
-        popup.location.href = target
-      } else {
-        window.location.href = target
-      }
-    }
 
-    const ready = existingPublicShare()
-    if (ready) {
-      void publishPublicDocument(invoice, company).catch(() => undefined)
-      go(ready.url, ready.total)
-      return
-    }
-
-    // Open the target window synchronously while the tap still has user activation.
-    // Android may block window.open/navigator.share after awaiting Firestore.
-    const popup = window.open('about:blank', '_blank')
-    try {
-      notify('Preparando enlace para WhatsApp…')
-      const shared = await prepareLink()
-      go(shared.url, shared.total, popup)
+      // Navigation happens synchronously in the same tap; no about:blank bridge.
+      window.location.href = target
     } catch (error) {
-      try { popup?.close() } catch { /* ignore */ }
-      notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.')
+      notify(error instanceof Error ? error.message : 'No se pudo preparar WhatsApp.')
     }
   }
 
-  const email = async () => {
+  const email = () => {
     if (!invoice.client.email.trim()) return notify('Agrega el correo del cliente antes de preparar el correo.')
-
-    const openMail = (url: string, total: number) => {
-      const message = shareDocumentMessage(invoice, url, total)
-      window.location.href = `mailto:${invoice.client.email}?subject=${encodeURIComponent(`${invoice.type} ${invoice.number}`)}&body=${encodeURIComponent(`${message}\n\nSaludos.`)}`
-    }
-
-    const ready = existingPublicShare()
-    if (ready) {
-      void publishPublicDocument(invoice, company).catch(() => undefined)
-      openMail(ready.url, ready.total)
-      return
-    }
-
     try {
-      notify('Preparando enlace para correo…')
-      const shared = await prepareLink()
-      openMail(shared.url, shared.total)
+      const shared = prepareInstantLink()
+      const message = shareDocumentMessage(invoice, shared.url, shared.total)
+      window.location.href = `mailto:${invoice.client.email}?subject=${encodeURIComponent(`${invoice.type} ${invoice.number}`)}&body=${encodeURIComponent(`${message}\n\nSaludos.`)}`
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'No se pudo crear el enlace.')
+      notify(error instanceof Error ? error.message : 'No se pudo preparar el correo.')
     }
   }
 
