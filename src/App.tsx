@@ -334,15 +334,17 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
 
   const download = () => {
     let source = invoice
+    let publicUrl = ''
     if (invoice.id) {
       try {
         const shared = prepareInstantLink()
         source = { ...invoice, publicShareId: shared.id }
+        publicUrl = shared.url
       } catch (error) {
         notify(error instanceof Error ? error.message : 'No se pudo preparar el enlace del PDF.')
       }
     }
-    buildInvoicePdf(source, company).save(`${invoice.number}.pdf`)
+    buildInvoicePdf(source, company, publicUrl).save(`${invoice.number}.pdf`)
   }
 
   async function copyTextSafe(text: string) {
