@@ -110,30 +110,6 @@
     }catch(error){console.error(error);proofMessage(proofFailure(error))}finally{button.disabled=false;button.textContent='Enviar comprobante para revisión'}
   }
 
-    try{proofMessage('Comprimiendo el comprobante para enviarlo…',true);compressedProof=await compressImage(file);$('fileName').textContent=`${file.name} · original ${(file.size/1024/1024).toFixed(2)} MB · optimizado ${(compressedProof.size/1024).toFixed(0)} KB`;$('proofPreview').src=compressedProof.dataUrl;$('proofPreview').style.display='block';$('proofMessage').className='proofMessage'}catch(error){$('proofFile').value='';$('fileName').textContent='';proofMessage(error?.message||'No se pudo preparar la imagen.')}
-  }
-
-  async function submitProof(event){
-    event.preventDefault();const button=$('submitProof'),file=$('proofFile').files?.[0],amountPaid=parseAmount($('paidAmount').value)
-    if(!data?.ownerUid)return proofMessage('Esta factura no tiene habilitada la recepción de comprobantes.')
-    if(!amountPaid)return proofMessage('Indica el monto que pagaste.')
-    if(!file||!compressedProof)return proofMessage('Selecciona y espera a que se prepare el voucher o capture.')
-    button.disabled=true;button.textContent='Enviando comprobante…';proofMessage('Enviando imagen optimizada de forma segura…',true)
-    try{
-      const user=await ensurePublicFirebase(),id=crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`
-      await setDoc(doc(publicDb,'paymentProofs',data.ownerUid,'submissions',id),{
-        ownerUid:data.ownerUid,submitterUid:user.uid,invoiceNumber:data.invoice||'',clientName:data.client||'',amountPaid,
-        amountCurrency:$('paidCurrency').value,paymentMethod:$('paidMethod').value,paymentDate:$('paidDate').value,
-        reference:$('paidReference').value.trim(),note:$('paidNote').value.trim(),imageData:compressedProof.dataUrl,
-        storagePath:`firestore-inline:${data.ownerUid}:${id}`,originalFileName:file.name.slice(0,180),contentType:'image/jpeg',
-        size:compressedProof.size,originalSize:file.size,status:'pending',invoiceCurrency:data.invoiceCurrency||'',invoiceTotal:Number(data.invoiceTotal)||0,
-        rateValue:Number(data.rateValue)||null,createdAt:serverTimestamp()
-      })
-      proofMessage('Comprobante enviado correctamente. El emisor lo recibirá en ZiviFactura para revisarlo y registrar tu pago.',true)
-      $('proofForm').reset();$('paidDate').value=new Date().toISOString().slice(0,10);$('fileName').textContent='';$('proofPreview').style.display='none';compressedProof=null
-    }catch(error){console.error(error);const code=error?.code||'';if(code.includes('operation-not-allowed'))proofMessage('La recepción de comprobantes todavía no está habilitada. El emisor debe activar el acceso anónimo en Firebase Authentication.');else if(code.includes('permission-denied'))proofMessage('No fue posible guardar el comprobante. El emisor debe publicar las reglas de Firestore de ZiviFactura.');else proofMessage('No se pudo enviar el comprobante. Revisa tu conexión e inténtalo nuevamente.')}finally{button.disabled=false;button.textContent='Enviar comprobante para revisión'}
-  }
-
   try{
     data=decodePayload();if(!data||data.version!==1)throw new Error('invalid')
     $('invoice').textContent=data.invoice||'Factura';$('meta').textContent=[data.company,data.client].filter(Boolean).join(' · ');$('total').textContent=data.total||''
