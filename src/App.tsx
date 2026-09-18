@@ -317,7 +317,19 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
     } finally { setSaving(false) }
   }
 
-  const download = () => buildInvoicePdf(invoice, company).save(`${invoice.number}.pdf`)
+  const download = async () => {
+    let source = invoice
+    if (invoice.id) {
+      try {
+        const shared = await prepareLink()
+        source = { ...invoice, publicShareId: shared.id }
+      } catch (error) {
+        // PDF generation remains available even if the cloud link cannot be refreshed.
+        notify(error instanceof Error ? `${error.message} El PDF se generará igualmente.` : 'No se pudo actualizar el enlace; el PDF se generará igualmente.')
+      }
+    }
+    buildInvoicePdf(source, company).save(`${invoice.number}.pdf`)
+  }
 
   function existingPublicShare() {
     const id = invoice.publicShareId
