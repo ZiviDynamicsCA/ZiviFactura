@@ -311,9 +311,23 @@ function Editor({ invoice: initial, company, clients, notify, onBack, onSaved }:
       if (id) await db.invoices.put(payload)
       else { id = Number(await db.invoices.add(payload)); await db.company.update(company.id, { nextInvoiceNumber: (company.nextInvoiceNumber || 1) + 1 }) }
       const saved = { ...payload, id }
-      setInvoice(saved)
-      onSaved(saved)
-      if (saved.publicShareId) void publishPublicDocument(saved, company).catch(() => undefined)
+      let finalSaved = saved
+
+      // Give every saved cloud document its public ID immediately and start
+      // publication before the user reaches WhatsApp/email/share. This keeps
+      // shared URLs short without reintroducing a blocking Firestore wait.
+      try {
+        const shared = preparePublicDocumentShare(saved, company)
+        finalSaved = { ...saved, publicShareId: shared.id }
+        await db.invoices.put(finalSaved)
+        void publishPublicDocument(finalSaved, company, shared)
+          .catch(error => console.warn('[ZiviFactura] publicación anticipada pendiente:', error))
+      } catch (error) {
+        console.warn('[ZiviFactura] no se pudo preparar publicación anticipada:', error)
+      }
+
+      setInvoice(finalSaved)
+      onSaved(finalSaved)
     } finally { setSaving(false) }
   }
 

@@ -122,11 +122,13 @@ export function preparePublicDocumentShare(invoice: Invoice, company: Company): 
   const cloudId = existing && !existing.startsWith('local-') ? existing : shareId()
   const id = user ? cloudId : (existing.startsWith('local-') ? existing : `local-${cloudId}`)
   const payload = buildPublicPayload(invoice, company, user?.uid || 'local')
-  const url = `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}#p=${encodePayload({
-    ...payload,
-    publicShareId: id,
-    shareId: id,
-  })}`
+  const url = user && firestore
+    ? `${window.location.origin}/documento.html?id=${encodeURIComponent(id)}`
+    : `${window.location.origin}/copiar.html#${encodePayload({
+        ...payload,
+        publicShareId: id,
+        shareId: id,
+      })}`
 
   if (invoice.id && invoice.publicShareId !== id) {
     void db.invoices.update(invoice.id, { publicShareId: id, updatedAt: new Date().toISOString() })
