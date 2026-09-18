@@ -9,12 +9,71 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="application-name" content="ZiviFactura" />
-    <link rel="manifest" href="/manifest.webmanifest?v=56" />
-    <link rel="icon" href="/zivifactura-app-192-v43.png?v=56" type="image/png" />
-    <link rel="apple-touch-icon" href="/zivifactura-app-512-v43.png?v=43" />
+    <link rel="manifest" href="/manifest.webmanifest?v=57" />
+    <link rel="icon" href="/zivifactura-app-192-v43.png?v=57" type="image/png" />
+    <link rel="apple-touch-icon" href="/zivifactura-app-192-v43.png?v=57" />
     <title>ZiviFactura</title>
   </head>
   <body>
+    <div id="zivi-boot-diagnostic" hidden style="position:fixed;z-index:2147483647;inset:0;overflow:auto;padding:22px;background:#f6faff;color:#102348;font-family:Arial,sans-serif">
+      <div style="max-width:620px;margin:28px auto;background:#fff;border:1px solid #d8e5f4;border-radius:18px;padding:20px;box-shadow:0 18px 46px rgba(18,60,113,.14)">
+        <strong id="zivi-boot-title" style="display:block;font-size:20px;margin-bottom:10px">ZiviFactura no pudo iniciar</strong>
+        <p style="margin:0 0 12px;color:#65779a;line-height:1.45">Esta pantalla reemplaza el fondo blanco para poder identificar exactamente qué bloqueó el arranque en este teléfono.</p>
+        <pre id="zivi-boot-detail" style="white-space:pre-wrap;word-break:break-word;background:#f3f7fc;border-radius:12px;padding:12px;font-size:12px;line-height:1.45"></pre>
+        <button type="button" onclick="location.reload()" style="border:0;border-radius:11px;background:#079cff;color:#fff;padding:11px 15px;font-weight:800">Reintentar</button>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var diagnostic = document.getElementById('zivi-boot-diagnostic');
+        var title = document.getElementById('zivi-boot-title');
+        var detail = document.getElementById('zivi-boot-detail');
+        var shown = false;
+
+        function textOf(value) {
+          try {
+            if (value && value.stack) return String(value.stack);
+            if (value && value.message) return String(value.message);
+            return String(value || 'Error desconocido');
+          } catch (_) {
+            return 'Error no serializable';
+          }
+        }
+
+        function showBootError(label, value) {
+          if (!diagnostic || !detail || !title) return;
+          shown = true;
+          title.textContent = label || 'ZiviFactura no pudo iniciar';
+          detail.textContent =
+            textOf(value) +
+            '\n\nNavegador: ' + navigator.userAgent +
+            '\nURL: ' + location.href +
+            '\nModo standalone: ' + (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches ? 'sí' : 'no') +
+            '\nService Worker: ' + ('serviceWorker' in navigator ? 'soportado' : 'no soportado');
+          diagnostic.hidden = false;
+        }
+
+        window.__ziviBootOk = function () {
+          window.__ziviAppBooted = true;
+          if (diagnostic) diagnostic.hidden = true;
+        };
+        window.__ziviShowBootError = showBootError;
+
+        window.addEventListener('error', function (event) {
+          showBootError('Error al cargar ZiviFactura', event.error || event.message || 'Error de script');
+        });
+
+        window.addEventListener('unhandledrejection', function (event) {
+          showBootError('Error durante el arranque', event.reason || 'Promesa rechazada sin detalle');
+        });
+
+        window.setTimeout(function () {
+          if (window.__ziviAppBooted || shown) return;
+          var ready = document.querySelector('.authScreen,.authLoading,.workspaceNav,.verifyScreen');
+          if (!ready) showBootError('ZiviFactura no terminó de iniciar', 'El paquete principal no llegó a mostrar ninguna pantalla después de 8 segundos.');
+        }, 8000);
+      })();
+    </script>
     <div id="root">
       <div id="boot-fallback" style="min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f6faff;color:#102348;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:center">
         <div style="max-width:420px">
