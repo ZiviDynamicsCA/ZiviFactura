@@ -182,6 +182,13 @@ export async function publishPublicDocument(
   }
 }
 
-export function shareDocumentMessage(invoice: Invoice, url: string, total = totals(invoice).total) {
-  return `Hola ${invoice.client.name || ''}. Te comparto ${invoice.type.toLowerCase()} ${invoice.number} por ${money(total, invoice.currency)}.\n\nPulsa este enlace para revisar el documento, copiar los datos de pago y cargar el voucher o capture cuando realices el pago:\n${url}\n\nDentro de la página también podrás descargar tu documento en PDF para conservarlo como soporte.`
+export function shareDocumentMessage(
+  invoice: Invoice,
+  url: string,
+  total = totals(invoice).total,
+  includeUrl = true,
+) {
+  const intro = `Hola ${invoice.client.name || ''}. Te comparto ${invoice.type.toLowerCase()} ${invoice.number} por ${money(total, invoice.currency)}.\n\nPulsa el enlace para revisar el documento, copiar los datos de pago y cargar el voucher o capture cuando realices el pago.`
+  const footer = 'Dentro de la página también podrás descargar tu documento en PDF para conservarlo como soporte.'
+  return includeUrl ? `${intro}\n\n${url}\n\n${footer}` : `${intro}\n\n${footer}`
 }
