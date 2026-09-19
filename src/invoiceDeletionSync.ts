@@ -16,11 +16,11 @@ export type InvoiceDeletionTombstone = {
 const PENDING_PREFIX = 'zivifactura.invoice-deletions.v1:'
 
 function safeKey(value: string) {
-  return encodeURIComponent(value.trim()).slice(0, 900) || \`deleted-\${Date.now()}\`
+  return encodeURIComponent(value.trim()).slice(0, 900) || `deleted-${Date.now()}`
 }
 
 function pendingKey(uid: string) {
-  return \`\${PENDING_PREFIX}\${uid}\`
+  return `${PENDING_PREFIX}${uid}`
 }
 
 function readPending(uid: string): InvoiceDeletionTombstone[] {
