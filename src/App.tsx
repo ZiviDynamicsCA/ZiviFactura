@@ -5,6 +5,7 @@ import { buildInvoicePdf, money, totals } from './pdf'
 import { appliedForInvoice, balanceForInvoice } from './payments'
 import { getActiveCompanyId } from './companyScope'
 import { preparePublicDocumentShare, publishPublicDocument, shareDocumentMessage } from './publicShare'
+import { deleteInvoiceEverywhere } from './invoiceDeletionSync'
 import RatesView from './RatesView'
 import { fetchLiveRates, formatRate, getCachedRates, getRateValue, invoiceEquivalentValues, rateSourceLabels, refreshRatesIfDue } from './rates'
 import type { BackupData, Client, Company, ConversionTarget, Invoice, InvoiceItem, InvoiceStatus, Payment, PaymentDisplay, RateSnapshot, RateSource } from './types'
@@ -144,8 +145,16 @@ export default function App() {
     setMode('editor')
   }
   const remove = async (i: Invoice) => {
-    if (!i.id || !confirm(`¿Eliminar ${i.number}?`)) return
-    await db.invoices.delete(i.id); await refresh(); notify('Documento eliminado.')
+    if (!i.id || !confirm(`¿Eliminar ${i.number}? Esta acción también eliminará copias técnicas de la misma factura para que no vuelvan a aparecer al sincronizar.`)) return
+    try {
+      const removed = await deleteInvoiceEverywhere(i)
+      await refresh()
+      notify(removed > 1 ? `Factura eliminada junto con ${removed - 1} copia(s) duplicada(s).` : 'Documento eliminado definitivamente.')
+    } catch (error) {
+      console.error('[ZiviFactura] delete invoice:', error)
+      await refresh()
+      notify('La factura se eliminó localmente. La eliminación en la nube seguirá reintentándose al sincronizar.')
+    }
   }
   const changeStatus = async (i: Invoice, status: InvoiceStatus) => {
     if (!i.id) return

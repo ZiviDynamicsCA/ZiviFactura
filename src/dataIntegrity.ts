@@ -67,6 +67,14 @@ function paymentCanonicalScore(payment: Payment) {
   return score
 }
 
+export function invoiceStableIdentity(invoice: Invoice) {
+  return JSON.stringify({
+    companyId: visibleCompanyId(invoice),
+    number: normalizeCode(invoice.number),
+    type: invoice.type || 'Factura',
+  })
+}
+
 export function invoiceTechnicalSignature(invoice: Invoice) {
   const total = totals(invoice).total
   return JSON.stringify({
@@ -142,7 +150,9 @@ export function isVisiblePayment(payment: Payment) {
 }
 
 export function uniqueOperationalInvoices(invoices: Invoice[]) {
-  return uniqueBySignature(invoices.filter(isOperationalInvoice), invoiceTechnicalSignature, invoiceCanonicalScore)
+  // Operational identity must not change when IVA, discount, items or totals are edited.
+  // Otherwise an older cloud copy becomes visible as a second invoice after an edit.
+  return uniqueBySignature(invoices.filter(isOperationalInvoice), invoiceStableIdentity, invoiceCanonicalScore)
 }
 
 export function uniqueOperationalPayments(payments: Payment[]) {
@@ -160,7 +170,7 @@ export async function restoreArchivedTechnicalRecords(): Promise<RestoreArchived
 // cuántos grupos duplicados existen para una futura pantalla manual de integridad.
 export async function repairExactInvoiceDuplicates(invoices: Invoice[] = []): Promise<InvoiceDuplicateRepairResult> {
   const active = invoices.filter(isOperationalInvoice)
-  return { scanned: invoices.length, groups: groupedCount(active, invoiceTechnicalSignature), hidden: 0 }
+  return { scanned: invoices.length, groups: groupedCount(active, invoiceStableIdentity), hidden: 0 }
 }
 
 export async function repairExactPaymentDuplicates(payments: Payment[] = []): Promise<PaymentDuplicateRepairResult> {
