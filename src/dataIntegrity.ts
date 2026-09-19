@@ -68,17 +68,10 @@ function paymentCanonicalScore(payment: Payment) {
 }
 
 export function invoiceStableIdentity(invoice: Invoice) {
-  const clientIdentity = normalizeCode(invoice.client?.taxId)
-    || normalizeText(invoice.client?.name)
-    || normalizeCode(invoice.client?.email)
-    || normalizeText(invoice.client?.phone).replace(/\D/g, '')
-
   return JSON.stringify({
     companyId: visibleCompanyId(invoice),
     number: normalizeCode(invoice.number),
     type: invoice.type || 'Factura',
-    date: invoice.date || '',
-    client: clientIdentity,
   })
 }
 
