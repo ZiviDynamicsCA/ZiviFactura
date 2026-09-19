@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
-import { uniqueOperationalInvoices, uniqueOperationalPayments } from './dataIntegrity'
+import { invoiceStableIdentity, uniqueOperationalInvoices, uniqueOperationalPayments } from './dataIntegrity'
+import { flushPendingInvoiceDeletions, pullInvoiceDeletionTombstones } from './invoiceDeletionSync'
 import { db, defaultCompany, invoiceLogicalKeyFor, makeSyncId } from './db'
 import { firestore } from './firebase'
 import type { Client, Company, Invoice, Payment, Product } from './types'
@@ -80,9 +81,10 @@ async function pushCompanies(uid: string) {
   if (main) await setDoc(doc(firestore, 'users', uid, 'company', 'main'), companyForCloud(main), { merge: true })
 }
 
-async function pushInvoices(uid: string) {
+async function pushInvoices(uid: string, deletedIdentities = new Set<string>()) {
   if (!firestore) return
   const invoices = uniqueOperationalInvoices(await db.invoices.toArray())
+    .filter(invoice => !deletedIdentities.has(invoiceStableIdentity(invoice)))
   await Promise.all(invoices.map(async invoice => {
     const companyId = companyIdOf(invoice)
     const normalized = withSyncId({ ...invoice, companyId, logicalKey: invoiceLogicalKeyFor({ companyId, number: invoice.number || '' }) }, 'inv') as Invoice
@@ -166,12 +168,13 @@ async function upsertBySyncId<T extends SyncableRecord>(
   }
 }
 
-async function pullInvoices(uid: string) {
+async function pullInvoices(uid: string, deletedIdentities = new Set<string>()) {
   if (!firestore) return
   const snapshots = await getDocs(collection(firestore, 'users', uid, 'invoices'))
   const remotes = snapshots.docs
     .map(snapshot => ({ snapshotId: snapshot.id, data: snapshot.data() as Invoice }))
     .filter(item => Boolean(item.data.number?.trim()))
+    .filter(item => !deletedIdentities.has(invoiceStableIdentity(item.data)))
   const uniqueRemotes = uniqueOperationalInvoices(remotes.map(item => ({ ...item.data, syncId: item.data.syncId || item.snapshotId })))
   for (const remote of uniqueRemotes) {
     const companyId = companyIdOf(remote)
@@ -223,21 +226,41 @@ async function pullPayments(uid: string) {
 export async function syncFirebaseNow(uid = activeUid || '') {
   if (!firestore || !uid || !navigator.onLine) return
   statusCallback?.('syncing', 'Sincronizando con Firebase…')
+
+  let deletedInvoiceIdentities = new Set<string>()
   applyingRemote = true
   try {
     await ensureLocalSyncIds()
-    await Promise.all([pullCompanies(uid), pullInvoices(uid), pullClients(uid), pullProducts(uid), pullPayments(uid)])
+
+    // Explicit user deletions are flushed before any pull. Remote tombstones
+    // then prevent an older device/cloud copy from resurrecting the invoice.
+    await flushPendingInvoiceDeletions(uid)
+    deletedInvoiceIdentities = await pullInvoiceDeletionTombstones(uid)
+
+    await Promise.all([
+      pullCompanies(uid),
+      pullInvoices(uid, deletedInvoiceIdentities),
+      pullClients(uid),
+      pullProducts(uid),
+      pullPayments(uid),
+    ])
   } finally {
     applyingRemote = false
   }
 
   try {
-    await Promise.all([pushCompanies(uid), pushInvoices(uid), pushClients(uid), pushProducts(uid), pushPayments(uid)])
+    await Promise.all([
+      pushCompanies(uid),
+      pushInvoices(uid, deletedInvoiceIdentities),
+      pushClients(uid),
+      pushProducts(uid),
+      pushPayments(uid),
+    ])
     await setDoc(doc(firestore, 'users', uid, 'meta', 'sync'), {
       lastSyncAt: new Date().toISOString(),
-      strategy: 'read-only-operational-dedupe-v5',
+      strategy: 'stable-invoice-identity-with-delete-tombstones-v6',
     }, { merge: true })
-    statusCallback?.('synced', 'Datos sincronizados con vista operativa protegida')
+    statusCallback?.('synced', 'Datos sincronizados · eliminaciones protegidas')
     window.dispatchEvent(new CustomEvent('zivifactura:data-synced', { detail: { removedInvoices: 0 } }))
   } catch (error) {
     console.warn('[ZiviFactura] Firebase sync:', error)
@@ -259,12 +282,14 @@ db.products.hook('creating', () => scheduleSync())
 db.products.hook('updating', () => scheduleSync())
 db.invoices.hook('creating', () => scheduleSync())
 db.invoices.hook('updating', () => scheduleSync())
+db.invoices.hook('deleting', () => scheduleSync())
 db.payments.hook('creating', () => scheduleSync())
 db.payments.hook('updating', () => scheduleSync())
 
-// Política de seguridad: la sincronización NO borra, NO archiva y NO restaura
-// registros automáticamente. Para operar, usa una vista deduplicada en lectura.
-// La base completa se conserva para respaldo y revisión manual futura.
+// Política de seguridad:
+// La sincronización no borra registros por heurísticas. Solo propaga una eliminación
+// cuando el usuario la solicita explícitamente; un tombstone impide que copias
+// antiguas de Firebase u otros dispositivos vuelvan a crear esa factura.
 
 export function startFirebaseSync(uid: string, callback?: StatusCallback) {
   activeUid = uid
