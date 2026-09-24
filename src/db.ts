@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { modulesForProfile, type BusinessProfileKey } from './businessProfiles'
 import type { BackupData, Client, Company, Invoice, Payment, Product } from './types'
 
 export function makeSyncId(prefix = 'rec') {
@@ -257,10 +258,19 @@ export async function ensureCompany() {
   else if (!existing.syncId) await db.company.update(1, { syncId: 'company_1' })
 }
 
-export async function createCompany(name = 'Nuevo negocio') {
+export async function createCompany(name = 'Nuevo negocio', businessProfile: BusinessProfileKey = 'services') {
   const rows = await db.company.toArray()
   const id = Math.max(0, ...rows.map(row => Number(row.id) || 0)) + 1
-  const company: Company = { ...defaultCompany, id, syncId: `company_${id}`, name, nextInvoiceNumber: 1 }
+  const company: Company = {
+    ...defaultCompany,
+    id,
+    syncId: `company_${id}`,
+    name,
+    nextInvoiceNumber: 1,
+    businessProfile,
+    enabledModules: modulesForProfile(businessProfile),
+    ...(businessProfile === 'education' ? { monthlyLateFeePct: 3, billingDay: 5 } : {}),
+  }
   await db.company.put(company)
   return company
 }
