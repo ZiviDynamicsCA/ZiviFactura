@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Bell, Building2, ChevronDown, LogOut, Plus } from 'lucide-react'
 import { createCompany, db, ensureCompany } from './db'
 import { getActiveCompanyId, setActiveCompanyId } from './companyScope'
+import type { BusinessProfileKey } from './businessProfiles'
 import type { Company } from './types'
 
 function clickWorkspace(index: number) {
@@ -55,7 +56,10 @@ export default function ZiviChrome() {
   async function addBusiness() {
     const name = window.prompt('Nombre del nuevo negocio o empresa:')?.trim()
     if (!name) return
-    const company = await createCompany(name)
+    const needsEducation = window.confirm('¿Este negocio necesita Inscripciones y cobro de mensualidades?\n\nAceptar: Centro educativo\nCancelar: Negocio general')
+    const profile: BusinessProfileKey = needsEducation ? 'education' : 'services'
+    const company = await createCompany(name, profile)
+    if (profile === 'education') localStorage.setItem(`zivifactura.education.enabled.${company.id}`, '1')
     setActiveCompanyId(company.id)
     window.location.reload()
   }
