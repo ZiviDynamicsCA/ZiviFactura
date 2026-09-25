@@ -206,6 +206,32 @@ function publicPayload(form: EducationForm, company: Company, ownerUid: string) 
   }
 }
 
+function encodeSharePayload(payload: unknown) {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload))
+  let binary = ''
+  bytes.forEach(byte => { binary += String.fromCharCode(byte) })
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+function publicEnrollmentUrl(form: EducationForm, company: Company, ownerUid: string) {
+  if (!form.publicId) return ''
+  const base = `${window.location.origin}/inscripcion.html?id=${encodeURIComponent(form.publicId)}`
+  if (form.kind !== 'enrollment') return base
+  const embedded = encodeSharePayload({
+    v: 1,
+    standard: 1,
+    active: true,
+    ownerUid,
+    companyId: form.companyId,
+    company: { name: company.name, phone: company.phone || '', email: company.email || '', city: company.city || '' },
+    formKey: form.key,
+    title: form.title,
+    description: form.description,
+    kind: form.kind,
+  })
+  return `${base}#p=${embedded}`
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string) {
   return new Promise<T>((resolve, reject) => {
     const timer = window.setTimeout(() => reject(new Error(message)), ms)
@@ -324,7 +350,11 @@ export default function EducationModule() {
   const activeForm = forms.find(form => form.key === activeKey) || forms[0] || null
   const fieldGroups = useMemo(() => groupFields(activeForm?.fields || []), [activeForm])
   const activeSubmissions = useMemo(() => activeForm?.publicId ? submissions.filter(item => item.formId === activeForm.publicId) : [], [submissions, activeForm])
-  const publicUrl = activeForm?.publicId ? `${window.location.origin}/inscripcion.html?id=${encodeURIComponent(activeForm.publicId)}` : ''
+  const publicUrl = activeForm?.publicId && company && firebaseAuth?.currentUser
+    ? publicEnrollmentUrl(activeForm, company, firebaseAuth.currentUser.uid)
+    : activeForm?.publicId
+      ? `${window.location.origin}/inscripcion.html?id=${encodeURIComponent(activeForm.publicId)}`
+      : ''
   const hasCloudSession = Boolean(firebaseAuth?.currentUser && firestore)
 
   useEffect(() => {
@@ -628,7 +658,8 @@ export default function EducationModule() {
     if (!activeForm || !company) return
     const published = activeForm.active && activeForm.publicId ? activeForm : publishForm(activeForm)
     if (!published?.publicId) return
-    const url = `${window.location.origin}/inscripcion.html?id=${encodeURIComponent(published.publicId)}`
+    const ownerUid = firebaseAuth?.currentUser?.uid || ''
+    const url = publicEnrollmentUrl(published, company, ownerUid)
     const text = `Hola. Te compartimos la planilla de inscripción de ${company.name || 'nuestro centro'}. Completa los datos desde este enlace:\n${url}`
     if (navigator.share) {
       try {
