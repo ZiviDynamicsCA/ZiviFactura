@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/app/:path*", "destination": "/" }
+  ],
   "headers": [
     {
       "source": "/sw.js",

@@ -3,8 +3,8 @@
   "name": "ZiviFactura",
   "short_name": "ZiviFactura",
   "description": "Facturación, cobros, cuentas por cobrar, tasas e inscripciones en una sola aplicación de Zivi Dynamics C.A.",
-  "start_url": "/?source=pwa&v=65",
-  "scope": "/",
+  "start_url": "/app/?source=pwa&v=66",
+  "scope": "/app/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#F6FAFF",
@@ -19,19 +19,19 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/zivifactura-app-192-v43.png?v=65",
+      "src": "/zivifactura-app-192-v43.png?v=66",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/zivifactura-app-512-v56.svg?v=65",
+      "src": "/zivifactura-app-512-v56.svg?v=66",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/zivifactura-app-512-v56.svg?v=65",
+      "src": "/zivifactura-app-512-v56.svg?v=66",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
