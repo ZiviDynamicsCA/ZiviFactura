@@ -312,13 +312,23 @@
         console.warn('SDK lento/fallido; usando REST',sdkError)
         await submitViaRest(id,payload,user)
       }
-      $('formStep').hidden=true;$('termsStep').hidden=true;$('success').classList.add('show');window.scrollTo({top:0,behavior:'smooth'})
+      $('formStep').hidden=true;$('termsStep').hidden=true
+      $('success').classList.add('show')
+      $('success').querySelector('h2').textContent='Inscripción enviada correctamente'
+      $('success').querySelector('p').textContent='La información, los acuerdos y las condiciones de pago fueron registrados. El centro ya puede verla en ZiviFactura para revisión y aprobación.'
+      window.scrollTo({top:0,behavior:'smooth'})
     }catch(error){
       console.error(error)
       const detail=`${error?.code||''} ${error?.message||''}`
-      $('message').className='message bad'
-      $('message').textContent=/permission|403|PERMISSION_DENIED/i.test(detail)?'No pudimos registrar la inscripción porque la plataforma aún no tiene habilitados los permisos públicos del formulario. Informa al centro.':'No se pudo enviar la inscripción. Verifica tu conexión e inténtalo nuevamente.'
-      button.disabled=false;button.textContent='Enviar inscripción'
+      const message=/permission|403|PERMISSION_DENIED/i.test(detail)
+        ? 'La inscripción NO fue enviada. Firestore rechazó el registro de la respuesta. Informa al centro para restablecer la conexión y vuelve a intentarlo.'
+        : /todavía no terminó de publicarse|Publicación pendiente/i.test(detail)
+          ? 'La inscripción NO fue enviada porque la planilla todavía no está lista para recibir respuestas. Espera unos segundos y vuelve a intentarlo.'
+          : 'La inscripción NO fue enviada. Verifica tu conexión e inténtalo nuevamente.'
+      $('termsMessage').className='message bad show'
+      $('termsMessage').textContent=message
+      button.disabled=false;button.textContent='Aceptar y enviar inscripción'
+      window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})
     }
   }
 
