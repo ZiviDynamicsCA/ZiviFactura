@@ -32,7 +32,56 @@
   let auth,formData
   const $=id=>document.getElementById(id)
   const formId=new URLSearchParams(location.search).get('id')||''
+  function decodeSharePayload(){
+    const raw=(location.hash||'').replace(/^#p=/,'')
+    if(!raw)return null
+    try{
+      const base64=raw.replace(/-/g,'+').replace(/_/g,'/')
+      const padded=base64+'='.repeat((4-base64.length%4)%4)
+      const binary=atob(padded)
+      const bytes=Uint8Array.from(binary,char=>char.charCodeAt(0))
+      return JSON.parse(new TextDecoder().decode(bytes))
+    }catch{return null}
+  }
   const makeId=()=>crypto.randomUUID?crypto.randomUUID().replace(/-/g,''):`${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
+  const standardField=(key,label,type,required=false,extra={})=>({id:`standard-${key}`,key,label,type,required,...extra})
+  function standardFields(){
+    return [
+      standardField('student_section','1. Datos del estudiante','section'),
+      standardField('studentName','Nombre y apellidos del estudiante','text',true),
+      standardField('birthDate','Fecha de nacimiento','date',true),
+      standardField('studentId','Cédula escolar / documento del estudiante','text'),
+      standardField('gradeSchool','Grado a cursar y colegio de procedencia','text',true),
+      standardField('address','Dirección de habitación','textarea',true),
+
+      standardField('academic_section','2. Información académica y diagnóstico','section'),
+      standardField('supportAreas','Áreas o asignaturas donde necesita apoyo','textarea'),
+      standardField('admissionReason','Motivo de ingreso o razón por la que solicita el servicio','textarea',true),
+      standardField('learningDiagnosis','Diagnóstico de aprendizaje o informe profesional, si aplica','textarea'),
+      standardField('homeContext','Contexto familiar y personas con quienes vive el estudiante','textarea'),
+
+      standardField('guardian_section','3. Representante y responsable de mensualidades','section'),
+      standardField('representativeNameId','Nombre, apellido y cédula del representante','text',true),
+      standardField('relationship','Parentesco o relación con el estudiante','text',true),
+      standardField('representativePhone','Teléfono principal del representante','phone',true),
+      standardField('email','Correo electrónico del representante','email',true,{placeholder:'correo@ejemplo.com'}),
+      standardField('payerNameId','Nombre, apellido y cédula de la persona responsable del pago','text',true),
+      standardField('payerPhone','Teléfono de contacto para mensualidades','phone',true),
+      standardField('workInfo','Ocupación, empresa y dirección de trabajo','textarea'),
+      standardField('contactInfo','Teléfono alternativo u otra información de contacto','textarea'),
+
+      standardField('health_section','4. Salud y autorizaciones','section'),
+      standardField('healthHistory','Condición médica, alergias o medicamentos importantes','textarea'),
+      standardField('authorizedPickup','Personas autorizadas para retirar al estudiante','textarea',true),
+      standardField('authorization','Autorizo el uso responsable de fotografías, videos y audios en actividades institucionales','radio',true,{options:['Sí','No']}),
+
+      standardField('billing_section','5. Inscripción y condiciones administrativas','section'),
+      standardField('enrollmentPlan','Modalidad solicitada','select',true,{options:['Inscripción regular','Inscripción + primera mensualidad','Mensualidad','Reingreso']}),
+      standardField('paymentResponsible','¿Quién recibirá las facturas y avisos de pago?','text',true),
+      standardField('lateFeeAccepted','Acepta las condiciones de mora por retraso de pago','radio',true,{options:['Sí','No']}),
+      standardField('institutionalAcceptance','Declaro que la información suministrada es correcta y acepto las condiciones institucionales','radio',true,{options:['Sí','No']}),
+    ]
+  }
   const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))
   const withTimeout=(promise,ms,message)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error(message)),ms);promise.then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})})
   function restValue(value){
@@ -97,16 +146,24 @@
   }
 
   async function readPublishedForm(){
-    for(let attempt=0;attempt<8;attempt+=1){
+    const embedded=decodeSharePayload()
+    if(embedded?.standard===1){
+      return {
+        ...embedded,
+        active:true,
+        fields:standardFields(),
+      }
+    }
+
+    for(let attempt=0;attempt<10;attempt+=1){
       try{
         const snap=await withTimeout(getDoc(doc(db,'publicForms',formId)),2800,'Lectura lenta')
         if(snap.exists())return snap.data()
       }catch(error){
-        const code=error?.code||''
-        if(code.includes('permission-denied'))throw error
+        console.warn('Esperando publicación del formulario',error)
       }
       if(attempt===2)$('loading').textContent='Sincronizando la planilla publicada…'
-      await wait(650)
+      await wait(700)
     }
     return null
   }
@@ -115,7 +172,16 @@
     if(!validate())return
     const button=$('submit');button.disabled=true;button.textContent='Enviando inscripción…';$('message').className='message';$('message').textContent=''
     try{
-      const user=await ensureAnonymous();const data=answers();const id=makeId();const timestamp=new Date().toISOString()
+      const user=await ensureAnonymous()
+      for(let attempt=0;attempt<8;attempt+=1){
+        try{
+          const snap=await withTimeout(getDoc(doc(db,'publicForms',formId)),2200,'Publicación pendiente')
+          if(snap.exists()&&snap.data().active===true)break
+        }catch{/* esperar a que termine la publicación */}
+        if(attempt===7)throw new Error('La planilla todavía no terminó de publicarse. Intenta enviar nuevamente en unos segundos.')
+        await wait(650)
+      }
+      const data=answers();const id=makeId();const timestamp=new Date().toISOString()
       const payload={
         version:1,formId,formKey:formData.formKey||'',companyId:Number(formData.companyId)||1,ownerUid:formData.ownerUid,anonymousUid:user.uid,
         answers:data,respondentName:data.studentName||data.representativeNameId||'',respondentEmail:data.email||'',status:'received',submittedAt:timestamp,createdAt:timestamp
@@ -146,8 +212,7 @@
       const form=$('form');form.innerHTML='';(formData.fields||[]).forEach(field=>form.append(renderField(field)));$('loading').hidden=true;$('content').hidden=false;$('submit').addEventListener('click',submit)
     }catch(error){
       console.error(error)
-      const detail=`${error?.code||''} ${error?.message||''}`
-      showError(/permission|403|PERMISSION_DENIED/i.test(detail)?'La planilla existe, pero la plataforma todavía no tiene habilitado el acceso público. Informa al centro.':'No pudimos cargar esta planilla. Verifica el enlace o inténtalo nuevamente.')
+      showError('No pudimos cargar esta planilla. Verifica el enlace o inténtalo nuevamente.')
     }
   }
   void init()
