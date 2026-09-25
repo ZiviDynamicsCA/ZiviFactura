@@ -334,29 +334,38 @@ export default function EducationModule() {
     const current = await db.company.get(companyId) || await db.company.get(1) || null
     setCompany(current || null)
 
-    const local = loadLocalForms(companyId)
+    const local = ensureStandardEnrollment(companyId, loadLocalForms(companyId))
+    saveLocalForms(companyId, local)
     setForms(local)
-    if (local[0]) setActiveKey(local[0].key)
-    let isEnabled = localStorage.getItem(localEnabledKey(companyId)) === '1'
+    setActiveKey(local[0]?.key || '')
+    const localEnabled = localStorage.getItem(localEnabledKey(companyId)) === '1'
+    const isEducationProfile = current?.businessProfile === 'education' || current?.enabledModules?.includes('education_enrollment')
+    const initialEnabled = localEnabled || Boolean(isEducationProfile)
+    if (initialEnabled) localStorage.setItem(localEnabledKey(companyId), '1')
+    setEnabled(initialEnabled)
 
     const user = firebaseAuth?.currentUser
-    if (firestore && user) {
+    if (!firestore || !user) return
+
+    void (async () => {
       try {
-        const moduleSnap = await getDoc(doc(firestore, 'users', user.uid, 'modules', `education-${companyId}`))
-        if (moduleSnap.exists()) isEnabled = Boolean(moduleSnap.data().enabled)
-        const remote = await getDocs(collection(firestore, 'users', user.uid, 'forms'))
-        const remoteForms = remote.docs.map(item => item.data() as EducationForm).filter(form => Number(form.companyId) === companyId)
-        if (remoteForms.length) {
-          const ordered = remoteForms.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
-          setForms(ordered)
-          saveLocalForms(companyId, ordered)
-          if (!ordered.some(form => form.key === activeKey)) setActiveKey(ordered[0].key)
+        const [moduleSnap, remote] = await Promise.all([
+          withTimeout(getDoc(doc(firestore, 'users', user.uid, 'modules', `education-${companyId}`)), 4500, 'Módulo remoto lento'),
+          withTimeout(getDocs(collection(firestore, 'users', user.uid, 'forms')), 4500, 'Planillas remotas lentas'),
+        ])
+        if (moduleSnap.exists() && Boolean(moduleSnap.data().enabled)) {
+          localStorage.setItem(localEnabledKey(companyId), '1')
+          setEnabled(true)
         }
+        const remoteForms = remote.docs.map(item => item.data() as EducationForm).filter(form => Number(form.companyId) === companyId)
+        const normalized = ensureStandardEnrollment(companyId, remoteForms.length ? remoteForms : local)
+        setForms(normalized)
+        saveLocalForms(companyId, normalized)
+        setActiveKey(currentKey => normalized.some(form => form.key === currentKey) ? currentKey : normalized[0]?.key || '')
       } catch (error) {
-        console.warn('[ZiviFactura] Education load:', error)
+        console.warn('[ZiviFactura] Education background load:', error)
       }
-    }
-    setEnabled(isEnabled)
+    })()
   }
 
   async function persistLocalFirst(nextForms: EducationForm[], options: { sync?: boolean } = {}) {
@@ -378,13 +387,8 @@ export default function EducationModule() {
 
   async function activate() {
     if (!company) return
-    setBusy(true)
-    setMessage('')
-    setRulesNeeded(false)
-
     const companyId = company.id || getActiveCompanyId()
-    const local = loadLocalForms(companyId)
-    const nextForms = local.length ? local : [enrollmentTemplate(companyId)]
+    const nextForms = ensureStandardEnrollment(companyId, loadLocalForms(companyId))
 
     localStorage.setItem(localEnabledKey(companyId), '1')
     saveLocalForms(companyId, nextForms)
@@ -392,12 +396,11 @@ export default function EducationModule() {
     setActiveKey(nextForms[0]?.key || '')
     setEnabled(true)
     setTab('forms')
-    setMessage('Módulo educativo activado. Edita la planilla, publícala y comparte el enlace con representantes.')
-    setBusy(false)
+    setMessage('Planilla estándar lista. Solo pulsa Compartir inscripción para enviar el enlace.')
 
     const user = firebaseAuth?.currentUser
     if (firestore && user) {
-      setDoc(doc(firestore, 'users', user.uid, 'modules', `education-${companyId}`), {
+      void setDoc(doc(firestore, 'users', user.uid, 'modules', `education-${companyId}`), {
         enabled: true,
         companyId,
         businessProfile: 'education',
@@ -461,31 +464,51 @@ export default function EducationModule() {
     }
   }
 
-  async function publishForm() {
-    if (!activeForm || !company) return
+  async function publishEnrollmentInBackground(published: EducationForm, currentCompany: Company, ownerUid: string) {
+    if (!firestore) return
+    const payload = publicPayload(published, currentCompany, ownerUid) as Record<string, unknown>
+    try {
+      await withTimeout(
+        setDoc(doc(firestore, 'publicForms', published.publicId!), payload, { merge: true }),
+        3500,
+        'Firestore SDK lento',
+      )
+      return
+    } catch (sdkError) {
+      console.warn('[ZiviFactura] publicación de inscripción lenta por SDK; usando REST:', sdkError)
+    }
+
+    try {
+      await publishFormViaRest(published.publicId!, payload)
+    } catch (restError) {
+      console.error('[ZiviFactura] publicación de inscripción falló por SDK y REST:', restError)
+      const message = restError instanceof Error ? restError.message : String(restError || '')
+      if (/403|permission|PERMISSION_DENIED/i.test(message)) setRulesNeeded(true)
+      setMessage('El enlace se preparó, pero Firebase no pudo publicar la planilla. Deben actualizarse las reglas de formularios públicos.')
+    }
+  }
+
+  function publishForm(form: EducationForm = activeForm as EducationForm) {
+    if (!form || !company) return null
     const user = firebaseAuth?.currentUser
     if (!firestore || !user) {
-      setMessage('Para publicar y recibir inscripciones desde otros teléfonos debes iniciar sesión con tu cuenta de ZiviFactura.')
-      return
+      setMessage('Para compartir inscripciones desde otros teléfonos debes iniciar sesión con tu cuenta de ZiviFactura.')
+      return null
     }
-    setBusy(true)
-    setMessage('')
+
+    const publicId = form.publicId || makeId()
+    const published: EducationForm = { ...form, publicId, active: true, updatedAt: now() }
+    const next = forms.map(item => item.key === published.key ? published : item)
+    if (!next.some(item => item.key === published.key)) next.unshift(published)
+
+    setForms(next)
+    saveLocalForms(activeCompanyId, next)
+    setActiveKey(published.key)
     setRulesNeeded(false)
-    try {
-      const publicId = activeForm.publicId || makeId()
-      const published: EducationForm = { ...activeForm, publicId, active: true, updatedAt: now() }
-      await setDoc(doc(firestore, 'publicForms', publicId), publicPayload(published, company, user.uid), { merge: true })
-      const next = forms.map(form => form.key === published.key ? published : form)
-      await persistLocalFirst(next, { sync: true })
-      setActiveKey(published.key)
-      setMessage('Planilla publicada. Ya puedes compartir el enlace con padres y representantes.')
-    } catch (error) {
-      const code = (error as { code?: string })?.code || ''
-      if (code.includes('permission-denied')) setRulesNeeded(true)
-      setMessage(code.includes('permission-denied') ? 'Firebase todavía no permite publicar formularios. Copia las reglas indicadas abajo y publícalas en Firestore.' : (error instanceof Error ? error.message : 'No se pudo publicar.'))
-    } finally {
-      setBusy(false)
-    }
+    setMessage('Enlace listo para compartir. La publicación se completa en segundo plano.')
+    syncFormsInBackground(next)
+    void publishEnrollmentInBackground(published, company, user.uid)
+    return published
   }
 
   async function unpublishForm() {
@@ -593,15 +616,22 @@ export default function EducationModule() {
   }
 
   async function shareForm() {
-    if (!activeForm?.publicId) return
-    const url = `${window.location.origin}/inscripcion.html?id=${encodeURIComponent(activeForm.publicId)}`
-    const text = `Hola. Te compartimos la planilla “${activeForm.title}” de ${company?.name || 'nuestro centro'}. Completa la inscripción desde este enlace:\n${url}`
+    if (!activeForm || !company) return
+    const published = activeForm.active && activeForm.publicId ? activeForm : publishForm(activeForm)
+    if (!published?.publicId) return
+    const url = `${window.location.origin}/inscripcion.html?id=${encodeURIComponent(published.publicId)}`
+    const text = `Hola. Te compartimos la planilla de inscripción de ${company.name || 'nuestro centro'}. Completa los datos desde este enlace:\n${url}`
     if (navigator.share) {
-      try { await navigator.share({ title: activeForm.title, text, url }); return } catch { /* user cancelled */ }
+      try {
+        await navigator.share({ title: 'Planilla de inscripción', text, url })
+        setMessage('Planilla compartida. El enlace queda activo para recibir respuestas.')
+        return
+      } catch { /* user cancelled or native share unavailable */ }
     }
     await copyText(text)
-    setMessage('Mensaje y enlace copiados para compartir.')
+    setMessage('Enlace y mensaje de inscripción copiados.')
   }
+
 
   if (!open) return null
 
