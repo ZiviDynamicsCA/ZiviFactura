@@ -86,7 +86,7 @@ service cloud.firestore {
           && request.resource.data.answers is map;
 
         allow read, update, delete: if request.auth != null
-          && request.auth.uid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid;
+          && resource.data.ownerUid == request.auth.uid;
       }
     }
   }

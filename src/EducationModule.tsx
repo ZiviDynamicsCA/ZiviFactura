@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, BookOpen, CheckCircle2, ClipboardList, Copy, ExternalLink, GraduationCap, Plus, Save, Send, Trash2, UserCheck, Users, X } from 'lucide-react'
-import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { db } from './db'
 import { getActiveCompanyId } from './companyScope'
 import { firebaseAuth, firestore } from './firebase'
@@ -72,7 +72,7 @@ const RULES_SNIPPET = `match /publicForms/{formId} {
       && request.resource.data.anonymousUid == request.auth.uid
       && request.resource.data.status == 'received';
     allow read, update, delete: if request.auth != null
-      && request.auth.uid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid;
+      && resource.data.ownerUid == request.auth.uid;
   }
 }`
 
@@ -635,7 +635,11 @@ export default function EducationModule() {
       }
 
       const batches = await Promise.all(ready.map(async form => {
-        const snap = await getDocs(collection(firestore, 'publicForms', form.publicId!, 'submissions'))
+        const submissionsQuery = query(
+          collection(firestore, 'publicForms', form.publicId!, 'submissions'),
+          where('ownerUid', '==', user.uid),
+        )
+        const snap = await getDocs(submissionsQuery)
         return snap.docs.map(item => ({ id: item.id, ...(item.data() as Omit<EducationSubmission, 'id'>) }))
       }))
       const rows = batches.flat().sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')))
