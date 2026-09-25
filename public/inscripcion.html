@@ -25,7 +25,7 @@
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js'
   import { initializeAuth, inMemoryPersistence, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js'
-  import { collection, doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js'
+  import { collection, doc, getDoc, getFirestore, setDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js'
 
   const firebaseConfig={apiKey:'AIzaSyBuuntT-Bpk_-tlKslOG5a2UeqPenCQ6uk',authDomain:'zivifactura.firebaseapp.com',projectId:'zivifactura',messagingSenderId:'276549383437',appId:'1:276549383437:web:212612caed5710d9ddec44'}
   const app=initializeApp(firebaseConfig),db=getFirestore(app)
@@ -33,6 +33,18 @@
   const $=id=>document.getElementById(id)
   const formId=new URLSearchParams(location.search).get('id')||''
   const makeId=()=>crypto.randomUUID?crypto.randomUUID().replace(/-/g,''):`${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
+  const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))
+  const withTimeout=(promise,ms,message)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error(message)),ms);promise.then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})})
+  function restValue(value){
+    if(value===null||value===undefined)return{nullValue:null}
+    if(Array.isArray(value))return{arrayValue:{values:value.map(restValue)}}
+    if(typeof value==='string')return{stringValue:value}
+    if(typeof value==='boolean')return{booleanValue:value}
+    if(typeof value==='number')return Number.isInteger(value)?{integerValue:String(value)}:{doubleValue:value}
+    if(typeof value==='object'){const fields={};Object.entries(value).forEach(([key,entry])=>{if(entry!==undefined)fields[key]=restValue(entry)});return{mapValue:{fields}}}
+    return{stringValue:String(value)}
+  }
+  function restFields(value){const fields={};Object.entries(value).forEach(([key,entry])=>{if(entry!==undefined)fields[key]=restValue(entry)});return fields}
 
   function showError(message){$('loading').hidden=true;$('error').textContent=message||'No pudimos abrir esta planilla.';$('error').classList.add('show')}
   function label(field){const span=document.createElement('span');span.textContent=field.label||'Pregunta';if(field.required)span.className='required';return span}
@@ -73,33 +85,70 @@
 
   async function ensureAnonymous(){
     if(!auth)auth=initializeAuth(app,{persistence:inMemoryPersistence})
-    if(!auth.currentUser)await signInAnonymously(auth)
+    if(!auth.currentUser)await withTimeout(signInAnonymously(auth),6000,'No se pudo abrir la sesión segura del formulario.')
     return auth.currentUser
+  }
+
+  async function submitViaRest(id,payload,user){
+    const token=await withTimeout(user.getIdToken(),4000,'No se pudo validar la sesión del formulario.')
+    const endpoint=`https://firestore.googleapis.com/v1/projects/zivifactura/databases/(default)/documents/publicForms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(id)}`
+    const response=await withTimeout(fetch(endpoint,{method:'PATCH',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({fields:restFields(payload)})}),8000,'El servidor tardó demasiado en recibir la inscripción.')
+    if(!response.ok){const detail=await response.text().catch(()=>'');throw new Error(`Firestore REST ${response.status}: ${detail.slice(0,200)}`)}
+  }
+
+  async function readPublishedForm(){
+    for(let attempt=0;attempt<8;attempt+=1){
+      try{
+        const snap=await withTimeout(getDoc(doc(db,'publicForms',formId)),2800,'Lectura lenta')
+        if(snap.exists())return snap.data()
+      }catch(error){
+        const code=error?.code||''
+        if(code.includes('permission-denied'))throw error
+      }
+      if(attempt===2)$('loading').textContent='Sincronizando la planilla publicada…'
+      await wait(650)
+    }
+    return null
   }
 
   async function submit(){
     if(!validate())return
-    const button=$('submit');button.disabled=true;$('message').className='message';$('message').textContent=''
+    const button=$('submit');button.disabled=true;button.textContent='Enviando inscripción…';$('message').className='message';$('message').textContent=''
     try{
-      const user=await ensureAnonymous();const data=answers();const id=makeId();
-      await setDoc(doc(collection(db,'publicForms',formId,'submissions'),id),{
+      const user=await ensureAnonymous();const data=answers();const id=makeId();const timestamp=new Date().toISOString()
+      const payload={
         version:1,formId,formKey:formData.formKey||'',companyId:Number(formData.companyId)||1,ownerUid:formData.ownerUid,anonymousUid:user.uid,
-        answers:data,respondentName:data.studentName||data.representativeNameId||'',respondentEmail:data.email||'',status:'received',submittedAt:new Date().toISOString(),createdAt:serverTimestamp()
-      })
+        answers:data,respondentName:data.studentName||data.representativeNameId||'',respondentEmail:data.email||'',status:'received',submittedAt:timestamp,createdAt:timestamp
+      }
+      try{
+        await withTimeout(setDoc(doc(collection(db,'publicForms',formId,'submissions'),id),payload),4500,'Firestore SDK lento')
+      }catch(sdkError){
+        console.warn('SDK lento/fallido; usando REST',sdkError)
+        await submitViaRest(id,payload,user)
+      }
       $('form').hidden=true;$('submitCard').hidden=true;$('success').classList.add('show');window.scrollTo({top:0,behavior:'smooth'})
     }catch(error){
-      console.error(error);$('message').className='message bad';$('message').textContent=(error?.code||'').includes('permission-denied')?'El formulario está publicado, pero Firebase todavía no permite recibir respuestas. Informa al centro para que actualice los permisos de la planilla.':'No se pudo enviar la inscripción. Verifica tu conexión e inténtalo nuevamente.';button.disabled=false
+      console.error(error)
+      const detail=`${error?.code||''} ${error?.message||''}`
+      $('message').className='message bad'
+      $('message').textContent=/permission|403|PERMISSION_DENIED/i.test(detail)?'No pudimos registrar la inscripción porque la plataforma aún no tiene habilitados los permisos públicos del formulario. Informa al centro.':'No se pudo enviar la inscripción. Verifica tu conexión e inténtalo nuevamente.'
+      button.disabled=false;button.textContent='Enviar inscripción'
     }
   }
 
   async function init(){
     if(!formId)return showError('El enlace de inscripción está incompleto.')
     try{
-      const snap=await getDoc(doc(db,'publicForms',formId));if(!snap.exists())return showError('Esta planilla no existe o el enlace ya no es válido.')
-      formData=snap.data();if(formData.active!==true)return showError('Esta planilla se encuentra pausada. Solicita un enlace actualizado al centro.')
+      formData=await readPublishedForm()
+      if(!formData)return showError('La planilla todavía no terminó de publicarse o el enlace ya no es válido. Abre nuevamente el enlace en unos segundos.')
+      if(formData.active!==true)return showError('Esta planilla se encuentra pausada. Solicita un enlace actualizado al centro.')
       $('formTitle').textContent=formData.title||'Planilla de inscripción';$('formDescription').textContent=formData.description||'Completa la información solicitada.';$('companyName').textContent=formData.company?.name||'Centro educativo';$('companyMeta').textContent=[formData.company?.city,formData.company?.phone,formData.company?.email].filter(Boolean).join(' · ')
-      const form=$('form');(formData.fields||[]).forEach(field=>form.append(renderField(field)));$('loading').hidden=true;$('content').hidden=false;$('submit').addEventListener('click',submit)
-    }catch(error){console.error(error);showError('No pudimos cargar esta planilla. Verifica el enlace o inténtalo nuevamente.')}
+      const form=$('form');form.innerHTML='';(formData.fields||[]).forEach(field=>form.append(renderField(field)));$('loading').hidden=true;$('content').hidden=false;$('submit').addEventListener('click',submit)
+    }catch(error){
+      console.error(error)
+      const detail=`${error?.code||''} ${error?.message||''}`
+      showError(/permission|403|PERMISSION_DENIED/i.test(detail)?'La planilla existe, pero la plataforma todavía no tiene habilitado el acceso público. Informa al centro.':'No pudimos cargar esta planilla. Verifica el enlace o inténtalo nuevamente.')
+    }
   }
   void init()
 </script>

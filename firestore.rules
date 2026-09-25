@@ -53,5 +53,41 @@ service cloud.firestore {
 
       allow read, update, delete: if request.auth != null && request.auth.uid == ownerUid;
     }
+
+
+    match /publicForms/{formId} {
+      allow read: if resource.data.active == true
+        || (request.auth != null && request.auth.uid == resource.data.ownerUid);
+
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.active == true
+        && request.resource.data.companyId is int
+        && request.resource.data.formKey is string
+        && request.resource.data.kind is string;
+
+      allow update: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      allow delete: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+
+      match /submissions/{submissionId} {
+        allow create: if request.auth != null
+          && request.auth.token.firebase.sign_in_provider == 'anonymous'
+          && exists(/databases/$(database)/documents/publicForms/$(formId))
+          && get(/databases/$(database)/documents/publicForms/$(formId)).data.active == true
+          && request.resource.data.formId == formId
+          && request.resource.data.formKey == get(/databases/$(database)/documents/publicForms/$(formId)).data.formKey
+          && request.resource.data.ownerUid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid
+          && request.resource.data.anonymousUid == request.auth.uid
+          && request.resource.data.status == 'received'
+          && request.resource.data.answers is map;
+
+        allow read, update, delete: if request.auth != null
+          && request.auth.uid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid;
+      }
+    }
   }
 }
