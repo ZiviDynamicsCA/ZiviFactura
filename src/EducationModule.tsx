@@ -660,7 +660,7 @@ export default function EducationModule() {
     if (!published?.publicId) return
     const ownerUid = firebaseAuth?.currentUser?.uid || ''
     const url = publicEnrollmentUrl(published, company, ownerUid)
-    const text = `Hola. Te compartimos la planilla de inscripción de ${company.name || 'nuestro centro'}. Completa los datos desde este enlace:\n${url}`
+    const text = `Hola. Te compartimos la planilla de inscripción de ${company.name || 'nuestro centro'}. Completa los datos desde este enlace:`
     if (navigator.share) {
       try {
         await navigator.share({ title: 'Planilla de inscripción', text, url })
@@ -668,7 +668,7 @@ export default function EducationModule() {
         return
       } catch { /* user cancelled or native share unavailable */ }
     }
-    await copyText(text)
+    await copyText(`${text}\n${url}`)
     setMessage('Enlace y mensaje de inscripción copiados.')
   }
 
