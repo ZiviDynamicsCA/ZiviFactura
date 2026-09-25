@@ -77,7 +77,7 @@ function LoginScreen({ onLocal }: { onLocal: () => void }) {
   const [password, setPassword] = useState('')
   const [signup, setSignup] = useState({
     fullName: '', companyName: '', taxId: '', phone: '', email: '', password: '', confirmPassword: '',
-    address: '', city: '', currency: 'USD', defaultTaxRate: '0', prefix: 'FAC',
+    address: '', city: '', currency: 'USD', defaultTaxRate: '0', prefix: 'FAC', businessProfile: 'services' as BusinessProfileKey,
     mobilePaymentBank: '', mobilePaymentPhone: '', mobilePaymentId: '',
     bankName: '', bankAccountType: '', bankAccountNumber: '', bankAccountHolder: '',
     binanceId: '', paymentNotes: '',
@@ -160,7 +160,13 @@ function LoginScreen({ onLocal }: { onLocal: () => void }) {
         bankAccountHolder: signup.bankAccountHolder.trim(),
         binanceId: signup.binanceId.trim(),
         paymentNotes: signup.paymentNotes.trim(),
+        businessProfile: signup.businessProfile,
+        enabledModules: modulesForProfile(signup.businessProfile),
+        ...(signup.businessProfile === 'education' ? { monthlyLateFeePct: 3, billingDay: 5 } : {}),
       })
+      if (signup.businessProfile === 'education') {
+        localStorage.setItem('zivifactura.education.enabled.1', '1')
+      }
       setActiveCompanyId(1)
       await sendAccountVerification(credential.user)
     } catch (err) {
@@ -169,7 +175,7 @@ function LoginScreen({ onLocal }: { onLocal: () => void }) {
     }
   }
 
-  const updateSignup = (key: keyof typeof signup, value: string) => setSignup(current => ({ ...current, [key]: value }))
+  const updateSignup = <K extends keyof typeof signup>(key: K, value: (typeof signup)[K]) => setSignup(current => ({ ...current, [key]: value }))
 
   return <main className="authScreen">
     <section className={`authPanel ${mode === 'signup' ? 'signupPanel' : ''}`}>
@@ -203,6 +209,13 @@ function LoginScreen({ onLocal }: { onLocal: () => void }) {
         <div className="signupSection"><strong>Datos de tu empresa</strong><small>Se guardarán directamente en Configuración y en tus próximos documentos.</small></div>
         <div className="signupGrid">
           <label><span>Empresa / razón social *</span><input value={signup.companyName} onChange={event => updateSignup('companyName', event.target.value)} required/></label>
+          <label><span>Tipo de negocio *</span><select value={signup.businessProfile} onChange={event => updateSignup('businessProfile', event.target.value as BusinessProfileKey)}>
+            <option value="services">Servicios / empresa general</option>
+            <option value="education">Centro educativo · inscripciones y mensualidades</option>
+            <option value="commerce">Comercio / tienda</option>
+            <option value="florist">Floristería</option>
+          </select></label>
+          {signup.businessProfile === 'education' && <div className="authNotice wide">Activaremos Inscripciones, estudiantes, mensualidades y mora para este negocio. La planilla de inscripción quedará disponible al entrar.</div>}
           <label><span>RIF / RUC / identificación fiscal</span><input value={signup.taxId} onChange={event => updateSignup('taxId', event.target.value)}/></label>
           <label><span>Ciudad</span><input value={signup.city} onChange={event => updateSignup('city', event.target.value)}/></label>
           <label><span>Moneda principal</span><select value={signup.currency} onChange={event => updateSignup('currency', event.target.value)}><option>USD</option><option>EUR</option><option>VES</option><option>USDT</option><option>COP</option></select></label>
@@ -333,7 +346,10 @@ function BusinessSwitcher({ activeId, onChange }: { activeId: number; onChange: 
   async function addBusiness() {
     const name = window.prompt('Nombre del nuevo negocio o empresa:')?.trim()
     if (!name) return
-    const company = await createCompany(name)
+    const needsEducation = window.confirm('¿Este negocio necesita Inscripciones y cobro de mensualidades?\n\nAceptar: Centro educativo\nCancelar: Negocio general')
+    const profile: BusinessProfileKey = needsEducation ? 'education' : 'services'
+    const company = await createCompany(name, profile)
+    if (profile === 'education') localStorage.setItem(`zivifactura.education.enabled.${company.id}`, '1')
     await load()
     onChange(company.id)
   }
