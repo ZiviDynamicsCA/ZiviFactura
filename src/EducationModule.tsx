@@ -500,27 +500,45 @@ export default function EducationModule() {
   }
 
   async function publishEnrollmentInBackground(published: EducationForm, currentCompany: Company, ownerUid: string) {
-    if (!firestore) return
+    if (!firestore || !published.publicId) return false
     const payload = publicPayload(published, currentCompany, ownerUid) as Record<string, unknown>
     try {
       await withTimeout(
-        setDoc(doc(firestore, 'publicForms', published.publicId!), payload, { merge: true }),
+        setDoc(doc(firestore, 'publicForms', published.publicId), payload, { merge: true }),
         3500,
         'Firestore SDK lento',
       )
-      return
     } catch (sdkError) {
       console.warn('[ZiviFactura] publicación de inscripción lenta por SDK; usando REST:', sdkError)
+      try {
+        await publishFormViaRest(published.publicId, payload)
+      } catch (restError) {
+        console.error('[ZiviFactura] publicación de inscripción falló por SDK y REST:', restError)
+        const message = restError instanceof Error ? restError.message : String(restError || '')
+        if (/403|permission|PERMISSION_DENIED/i.test(message)) setRulesNeeded(true)
+        return false
+      }
     }
 
     try {
-      await publishFormViaRest(published.publicId!, payload)
-    } catch (restError) {
-      console.error('[ZiviFactura] publicación de inscripción falló por SDK y REST:', restError)
-      const message = restError instanceof Error ? restError.message : String(restError || '')
-      if (/403|permission|PERMISSION_DENIED/i.test(message)) setRulesNeeded(true)
-      setMessage('El enlace se preparó, pero Firebase no pudo publicar la planilla. Deben actualizarse las reglas de formularios públicos.')
+      const verify = await withTimeout(getDoc(doc(firestore, 'publicForms', published.publicId)), 3500, 'No se pudo verificar la planilla pública.')
+      return verify.exists() && verify.data().ownerUid === ownerUid && verify.data().active === true
+    } catch (error) {
+      console.warn('[ZiviFactura] no se pudo verificar la publicación:', error)
+      return false
     }
+  }
+
+  async function ensurePublishedForm(form: EducationForm) {
+    const user = firebaseAuth?.currentUser
+    if (!firestore || !user || !company || !form.publicId) return false
+    try {
+      const snap = await withTimeout(getDoc(doc(firestore, 'publicForms', form.publicId)), 2500, 'Verificación lenta')
+      if (snap.exists() && snap.data().ownerUid === user.uid && snap.data().active === true) return true
+    } catch (error) {
+      console.warn('[ZiviFactura] parent public form missing or inaccessible, repairing:', error)
+    }
+    return publishEnrollmentInBackground({ ...form, active: true }, company, user.uid)
   }
 
   function publishForm(form: EducationForm = activeForm as EducationForm) {
@@ -540,9 +558,8 @@ export default function EducationModule() {
     saveLocalForms(activeCompanyId, next)
     setActiveKey(published.key)
     setRulesNeeded(false)
-    setMessage('Enlace listo para compartir. La publicación se completa en segundo plano.')
+    setMessage('Preparando enlace de inscripción…')
     syncFormsInBackground(next)
-    void publishEnrollmentInBackground(published, company, user.uid)
     return published
   }
 
@@ -601,21 +618,35 @@ export default function EducationModule() {
       return
     }
     setBusy(true)
-    setMessage('')
+    setMessage('Sincronizando inscripciones…')
     setRulesNeeded(false)
     try {
       const published = forms.filter(form => form.publicId)
-      const batches = await Promise.all(published.map(async form => {
+      const ready: EducationForm[] = []
+      for (const form of published) {
+        const ok = await ensurePublishedForm(form)
+        if (ok) ready.push(form)
+      }
+
+      if (published.length && !ready.length) {
+        setRulesNeeded(true)
+        setMessage('No se pudo restablecer la conexión con Firestore. Revisa que las reglas publicadas incluyan publicForms y submissions.')
+        return
+      }
+
+      const batches = await Promise.all(ready.map(async form => {
         const snap = await getDocs(collection(firestore, 'publicForms', form.publicId!, 'submissions'))
         return snap.docs.map(item => ({ id: item.id, ...(item.data() as Omit<EducationSubmission, 'id'>) }))
       }))
       const rows = batches.flat().sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')))
       setSubmissions(rows)
-      setMessage(rows.length ? `${rows.length} respuesta(s) cargada(s).` : 'Todavía no hay respuestas recibidas.')
+      setMessage(rows.length ? `${rows.length} inscripción(es) recibida(s) listas para revisión.` : 'Conexión correcta. Todavía no hay inscripciones recibidas; si la prueba anterior no mostró confirmación, vuelve a enviarla.')
     } catch (error) {
       const code = (error as { code?: string })?.code || ''
       if (code.includes('permission-denied')) setRulesNeeded(true)
-      setMessage(code.includes('permission-denied') ? 'Faltan permisos de Firestore para leer las inscripciones. Usa las reglas indicadas abajo.' : 'No se pudieron cargar las respuestas.')
+      setMessage(code.includes('permission-denied')
+        ? 'Firestore rechazó la lectura de respuestas. La planilla puede abrir, pero la colección de respuestas aún no tiene permisos efectivos.'
+        : 'No se pudieron cargar las respuestas.')
     } finally {
       setBusy(false)
     }
@@ -654,18 +685,34 @@ export default function EducationModule() {
     if (!activeForm || !company) return
     const published = activeForm.active && activeForm.publicId ? activeForm : publishForm(activeForm)
     if (!published?.publicId) return
-    const ownerUid = firebaseAuth?.currentUser?.uid || ''
-    const url = publicEnrollmentUrl(published, company, ownerUid)
-    const text = `Hola. Te compartimos la planilla de inscripción de ${company.name || 'nuestro centro'}. Completa los datos desde este enlace:`
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Planilla de inscripción', text, url })
-        setMessage('Planilla compartida. El enlace queda activo para recibir respuestas.')
+    const user = firebaseAuth?.currentUser
+    if (!user) return
+
+    setBusy(true)
+    setMessage('Verificando que la planilla pueda recibir respuestas…')
+    setRulesNeeded(false)
+    try {
+      const ready = await ensurePublishedForm(published)
+      if (!ready) {
+        setRulesNeeded(true)
+        setMessage('No compartiré el enlace todavía porque Firestore no confirmó que pueda recibir respuestas. Revisa las reglas publicadas y pulsa nuevamente Compartir inscripción.')
         return
-      } catch { /* user cancelled or native share unavailable */ }
+      }
+
+      const url = publicEnrollmentUrl(published, company, user.uid)
+      const text = `Hola. Te compartimos la planilla de inscripción de ${company.name || 'nuestro centro'}. Completa los datos desde este enlace:`
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'Planilla de inscripción', text, url })
+          setMessage('Planilla compartida y lista para recibir respuestas.')
+          return
+        } catch { /* user cancelled or native share unavailable */ }
+      }
+      await copyText(`${text}\n${url}`)
+      setMessage('Enlace verificado y copiado. La planilla está lista para recibir respuestas.')
+    } finally {
+      setBusy(false)
     }
-    await copyText(`${text}\n${url}`)
-    setMessage('Enlace y mensaje de inscripción copiados.')
   }
 
 
@@ -721,7 +768,7 @@ export default function EducationModule() {
         </nav>
 
         {message && <div className="educationMessage">{message}</div>}
-        {rulesNeeded && <div className="educationRules"><strong>Configuración necesaria en Firestore</strong><p>El módulo está listo, pero Firebase debe permitir la lectura del formulario público y la creación de respuestas anónimas.</p><pre>{RULES_SNIPPET}</pre><button onClick={() => void copyText(RULES_SNIPPET)}><Copy size={15}/>Copiar reglas</button></div>}
+        {rulesNeeded && <div className="educationRules"><strong>Conexión de Inscripciones pendiente</strong><p>Firestore está rechazando el documento público o sus respuestas. Si ya publicaste las reglas de publicForms/submissions, pulsa Reintentar conexión para que ZiviFactura repare la planilla pública y vuelva a leer las respuestas.</p><div className="educationResponseActions"><button className="educationPrimary small" disabled={busy} onClick={() => void loadResponses()}>Reintentar conexión</button><button onClick={() => void copyText(RULES_SNIPPET)}><Copy size={15}/>Copiar bloque de reglas</button></div></div>}
 
         {tab === 'forms' && <div className="educationWorkspace">
           <aside className="educationFormList">
