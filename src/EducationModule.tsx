@@ -72,7 +72,7 @@ const RULES_SNIPPET = `match /publicForms/{formId} {
       && request.resource.data.anonymousUid == request.auth.uid
       && request.resource.data.status == 'received';
     allow read, update, delete: if request.auth != null
-      && request.auth.uid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid;
+      && resource.data.ownerUid == request.auth.uid;
   }
 }`
 
