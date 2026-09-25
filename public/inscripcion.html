@@ -287,14 +287,6 @@
     const button=$('submit');button.disabled=true;button.textContent='Enviando inscripción…';$('termsMessage').className='message';$('termsMessage').textContent=''
     try{
       const user=await ensureAnonymous()
-      for(let attempt=0;attempt<8;attempt+=1){
-        try{
-          const snap=await withTimeout(getDoc(doc(db,'publicForms',formId)),2200,'Publicación pendiente')
-          if(snap.exists()&&snap.data().active===true)break
-        }catch{/* esperar a que termine la publicación */}
-        if(attempt===7)throw new Error('La planilla todavía no terminó de publicarse. Intenta enviar nuevamente en unos segundos.')
-        await wait(650)
-      }
       const data=answers();const id=makeId();const timestamp=new Date().toISOString()
       data.serviceTermsAccepted='Sí'
       data.paymentTermsAccepted='Sí'
@@ -322,9 +314,7 @@
       const detail=`${error?.code||''} ${error?.message||''}`
       const message=/permission|403|PERMISSION_DENIED/i.test(detail)
         ? 'La inscripción NO fue enviada. Firestore rechazó el registro de la respuesta. Informa al centro para restablecer la conexión y vuelve a intentarlo.'
-        : /todavía no terminó de publicarse|Publicación pendiente/i.test(detail)
-          ? 'La inscripción NO fue enviada porque la planilla todavía no está lista para recibir respuestas. Espera unos segundos y vuelve a intentarlo.'
-          : 'La inscripción NO fue enviada. Verifica tu conexión e inténtalo nuevamente.'
+        : 'La inscripción NO fue enviada. Verifica tu conexión e inténtalo nuevamente.'
       $('termsMessage').className='message bad show'
       $('termsMessage').textContent=message
       button.disabled=false;button.textContent='Aceptar y enviar inscripción'

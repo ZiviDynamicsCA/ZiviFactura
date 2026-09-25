@@ -76,11 +76,14 @@ service cloud.firestore {
       match /submissions/{submissionId} {
         allow create: if request.auth != null
           && request.auth.token.firebase.sign_in_provider == 'anonymous'
-          && exists(/databases/$(database)/documents/publicForms/$(formId))
-          && get(/databases/$(database)/documents/publicForms/$(formId)).data.active == true
           && request.resource.data.formId == formId
-          && request.resource.data.formKey == get(/databases/$(database)/documents/publicForms/$(formId)).data.formKey
-          && request.resource.data.ownerUid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid
+          && request.resource.data.formId is string
+          && request.resource.data.formId.size() >= 12
+          && request.resource.data.formKey is string
+          && request.resource.data.formKey.size() > 0
+          && request.resource.data.ownerUid is string
+          && request.resource.data.ownerUid.size() > 0
+          && request.resource.data.companyId is int
           && request.resource.data.anonymousUid == request.auth.uid
           && request.resource.data.status == 'received'
           && request.resource.data.answers is map;

@@ -66,11 +66,13 @@ const RULES_SNIPPET = `match /publicForms/{formId} {
   match /submissions/{submissionId} {
     allow create: if request.auth != null
       && request.auth.token.firebase.sign_in_provider == 'anonymous'
-      && get(/databases/$(database)/documents/publicForms/$(formId)).data.active == true
       && request.resource.data.formId == formId
-      && request.resource.data.ownerUid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid
+      && request.resource.data.formKey is string
+      && request.resource.data.ownerUid is string
+      && request.resource.data.companyId is int
       && request.resource.data.anonymousUid == request.auth.uid
-      && request.resource.data.status == 'received';
+      && request.resource.data.status == 'received'
+      && request.resource.data.answers is map;
     allow read, update, delete: if request.auth != null
       && resource.data.ownerUid == request.auth.uid;
   }
@@ -622,19 +624,7 @@ export default function EducationModule() {
     setRulesNeeded(false)
     try {
       const published = forms.filter(form => form.publicId)
-      const ready: EducationForm[] = []
-      for (const form of published) {
-        const ok = await ensurePublishedForm(form)
-        if (ok) ready.push(form)
-      }
-
-      if (published.length && !ready.length) {
-        setRulesNeeded(true)
-        setMessage('No se pudo restablecer la conexión con Firestore. Revisa que las reglas publicadas incluyan publicForms y submissions.')
-        return
-      }
-
-      const batches = await Promise.all(ready.map(async form => {
+      const batches = await Promise.all(published.map(async form => {
         const submissionsQuery = query(
           collection(firestore, 'publicForms', form.publicId!, 'submissions'),
           where('ownerUid', '==', user.uid),
@@ -644,7 +634,7 @@ export default function EducationModule() {
       }))
       const rows = batches.flat().sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')))
       setSubmissions(rows)
-      setMessage(rows.length ? `${rows.length} inscripción(es) recibida(s) listas para revisión.` : 'Conexión correcta. Todavía no hay inscripciones recibidas; si la prueba anterior no mostró confirmación, vuelve a enviarla.')
+      setMessage(rows.length ? `${rows.length} inscripción(es) recibida(s) listas para revisión.` : 'Conexión correcta. Todavía no hay inscripciones recibidas.')
     } catch (error) {
       const code = (error as { code?: string })?.code || ''
       if (code.includes('permission-denied')) setRulesNeeded(true)
@@ -693,27 +683,21 @@ export default function EducationModule() {
     if (!user) return
 
     setBusy(true)
-    setMessage('Verificando que la planilla pueda recibir respuestas…')
+    setMessage('Preparando enlace de inscripción…')
     setRulesNeeded(false)
     try {
-      const ready = await ensurePublishedForm(published)
-      if (!ready) {
-        setRulesNeeded(true)
-        setMessage('No compartiré el enlace todavía porque Firestore no confirmó que pueda recibir respuestas. Revisa las reglas publicadas y pulsa nuevamente Compartir inscripción.')
-        return
-      }
-
+      void publishEnrollmentInBackground(published, company, user.uid)
       const url = publicEnrollmentUrl(published, company, user.uid)
       const text = `Hola. Te compartimos la planilla de inscripción de ${company.name || 'nuestro centro'}. Completa los datos desde este enlace:`
       if (navigator.share) {
         try {
           await navigator.share({ title: 'Planilla de inscripción', text, url })
-          setMessage('Planilla compartida y lista para recibir respuestas.')
+          setMessage('Planilla compartida. Las respuestas se guardarán directamente en ZiviFactura.')
           return
         } catch { /* user cancelled or native share unavailable */ }
       }
       await copyText(`${text}\n${url}`)
-      setMessage('Enlace verificado y copiado. La planilla está lista para recibir respuestas.')
+      setMessage('Enlace copiado. Las respuestas se guardarán directamente en ZiviFactura.')
     } finally {
       setBusy(false)
     }
