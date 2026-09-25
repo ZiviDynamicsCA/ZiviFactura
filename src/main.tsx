@@ -4,7 +4,9 @@ import AuthShellV2 from './AuthShellV2'
 import EducationModule from './EducationModule'
 import HelpCenter from './HelpCenter'
 import InstallPrompt from './InstallPrompt'
+import ModuleBridge from './ModuleBridge'
 import QuickTools from './QuickTools'
+import TuitionModule from './TuitionModule'
 import ZiviChrome from './ZiviChrome'
 import { modulesForProfile, type BusinessProfileKey } from './businessProfiles'
 import { initAutomaticBackup } from './cloudBackup'
@@ -116,7 +118,9 @@ function mountApp() {
       <AuthShellV2 />
       <ZiviChrome />
       <QuickTools />
+      <ModuleBridge />
       <EducationModule />
+      <TuitionModule />
       <HelpCenter />
       <InstallPrompt />
     </React.StrictMode>,
