@@ -54,14 +54,23 @@ type FieldGroup = {
   rows: Array<{ field: EducationField; index: number; number: number }>
 }
 
-const RULES_SNIPPET = `// Agrega estos bloques dentro de service cloud.firestore { match /databases/{database}/documents { ... } }
-match /publicForms/{formId} {
-  allow read: if resource.data.active == true || (request.auth != null && request.auth.uid == resource.data.ownerUid);
-  allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
-  allow update, delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+const RULES_SNIPPET = `match /publicForms/{formId} {
+  allow read: if resource.data.active == true
+    || (request.auth != null && request.auth.uid == resource.data.ownerUid);
+  allow create: if request.auth != null
+    && request.resource.data.ownerUid == request.auth.uid
+    && request.resource.data.active == true;
+  allow update, delete: if request.auth != null
+    && request.auth.uid == resource.data.ownerUid;
 
   match /submissions/{submissionId} {
-    allow create: if request.auth != null;
+    allow create: if request.auth != null
+      && request.auth.token.firebase.sign_in_provider == 'anonymous'
+      && get(/databases/$(database)/documents/publicForms/$(formId)).data.active == true
+      && request.resource.data.formId == formId
+      && request.resource.data.ownerUid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid
+      && request.resource.data.anonymousUid == request.auth.uid
+      && request.resource.data.status == 'received';
     allow read, update, delete: if request.auth != null
       && request.auth.uid == get(/databases/$(database)/documents/publicForms/$(formId)).data.ownerUid;
   }
