@@ -92,49 +92,73 @@ const f = (key: string, label: string, type: FieldType, required = false, extra:
   ...extra,
 })
 
+function standardField(key: string, label: string, type: FieldType, required = false, extra: Partial<EducationField> = {}): EducationField {
+  return { id: `standard-${key}`, key, label, type, required, ...extra }
+}
+
 function enrollmentTemplate(companyId: number): EducationForm {
   const createdAt = now()
   return {
-    key: `enrollment-${companyId}-${Date.now().toString(36)}`,
+    key: `enrollment-standard-${companyId}`,
     companyId,
     title: 'Planilla de inscripción',
-    description: 'Completa la información del estudiante y de su representante. El centro revisará la solicitud y te contactará para confirmar el proceso administrativo.',
+    description: 'Completa los datos del estudiante, su representante y la información administrativa solicitada. El centro revisará la inscripción y te contactará para continuar el proceso.',
     kind: 'enrollment',
     active: false,
     createdAt,
     updatedAt: createdAt,
     fields: [
-      f('student_section', '1. Datos del estudiante', 'section'),
-      f('email', 'Correo electrónico del representante', 'email', true, { placeholder: 'correo@ejemplo.com' }),
-      f('studentName', 'Nombre y apellidos del estudiante', 'text', true),
-      f('birthDate', 'Fecha de nacimiento', 'date', true),
-      f('studentId', 'Cédula escolar / documento del estudiante', 'text', false),
-      f('gradeSchool', 'Grado a cursar y colegio de procedencia', 'text', true),
-      f('address', 'Dirección de habitación', 'textarea', true),
+      standardField('student_section', '1. Datos del estudiante', 'section'),
+      standardField('studentName', 'Nombre y apellidos del estudiante', 'text', true),
+      standardField('birthDate', 'Fecha de nacimiento', 'date', true),
+      standardField('studentId', 'Cédula escolar / documento del estudiante', 'text'),
+      standardField('gradeSchool', 'Grado a cursar y colegio de procedencia', 'text', true),
+      standardField('address', 'Dirección de habitación', 'textarea', true),
 
-      f('guardian_section', '2. Representante y responsable de pago', 'section'),
-      f('representativeNameId', 'Nombre, apellido y cédula del representante', 'text', true),
-      f('payerNameId', 'Nombre, apellido y cédula de la persona responsable del pago', 'text', true),
-      f('payerPhone', 'Teléfono de contacto para mensualidades', 'phone', true),
-      f('contactInfo', 'Teléfono alternativo y correo adicional', 'textarea', false),
-      f('workInfo', 'Ocupación, empresa y dirección de trabajo', 'textarea', false),
+      standardField('academic_section', '2. Información académica y diagnóstico', 'section'),
+      standardField('supportAreas', 'Áreas o asignaturas donde necesita apoyo', 'textarea'),
+      standardField('admissionReason', 'Motivo de ingreso o razón por la que solicita el servicio', 'textarea', true),
+      standardField('learningDiagnosis', 'Diagnóstico de aprendizaje o informe profesional, si aplica', 'textarea'),
+      standardField('homeContext', 'Contexto familiar y personas con quienes vive el estudiante', 'textarea'),
 
-      f('academic_section', '3. Información académica y familiar', 'section'),
-      f('supportAreas', 'Áreas o asignaturas donde necesita apoyo', 'textarea', false),
-      f('learningDiagnosis', 'Diagnóstico de aprendizaje o informe profesional, si aplica', 'textarea', false),
-      f('homeContext', 'Personas con quienes vive el estudiante y observaciones familiares importantes', 'textarea', false),
+      standardField('guardian_section', '3. Representante y responsable de mensualidades', 'section'),
+      standardField('representativeNameId', 'Nombre, apellido y cédula del representante', 'text', true),
+      standardField('relationship', 'Parentesco o relación con el estudiante', 'text', true),
+      standardField('representativePhone', 'Teléfono principal del representante', 'phone', true),
+      standardField('email', 'Correo electrónico del representante', 'email', true, { placeholder: 'correo@ejemplo.com' }),
+      standardField('payerNameId', 'Nombre, apellido y cédula de la persona responsable del pago', 'text', true),
+      standardField('payerPhone', 'Teléfono de contacto para mensualidades', 'phone', true),
+      standardField('workInfo', 'Ocupación, empresa y dirección de trabajo', 'textarea'),
+      standardField('contactInfo', 'Teléfono alternativo u otra información de contacto', 'textarea'),
 
-      f('billing_section', '4. Datos administrativos y pagos', 'section'),
-      f('enrollmentPlan', 'Modalidad solicitada', 'select', true, { options: ['Inscripción regular', 'Inscripción + primera mensualidad', 'Mensualidad', 'Reingreso'] }),
-      f('paymentResponsible', '¿Quién recibirá las facturas y avisos de pago?', 'text', true),
-      f('lateFeeAccepted', 'Acepta las condiciones de mora por retraso de pago', 'radio', true, { options: ['Sí', 'No'] }),
+      standardField('health_section', '4. Salud y autorizaciones', 'section'),
+      standardField('healthHistory', 'Condición médica, alergias o medicamentos importantes', 'textarea'),
+      standardField('authorizedPickup', 'Personas autorizadas para retirar al estudiante', 'textarea', true),
+      standardField('authorization', 'Autorizo el uso responsable de fotografías, videos y audios en actividades institucionales', 'radio', true, { options: ['Sí', 'No'] }),
 
-      f('health_section', '5. Salud y autorizaciones', 'section'),
-      f('healthHistory', 'Condición médica, alergias o medicamentos importantes', 'textarea', false),
-      f('authorizedPickup', 'Personas autorizadas para retirar al estudiante', 'textarea', true),
-      f('authorization', 'Autorizo el uso responsable de fotografías, videos y audios en actividades institucionales', 'radio', true, { options: ['Sí', 'No'] }),
+      standardField('billing_section', '5. Inscripción y condiciones administrativas', 'section'),
+      standardField('enrollmentPlan', 'Modalidad solicitada', 'select', true, { options: ['Inscripción regular', 'Inscripción + primera mensualidad', 'Mensualidad', 'Reingreso'] }),
+      standardField('paymentResponsible', '¿Quién recibirá las facturas y avisos de pago?', 'text', true),
+      standardField('lateFeeAccepted', 'Acepta las condiciones de mora por retraso de pago', 'radio', true, { options: ['Sí', 'No'] }),
+      standardField('institutionalAcceptance', 'Declaro que la información suministrada es correcta y acepto las condiciones institucionales', 'radio', true, { options: ['Sí', 'No'] }),
     ],
   }
+}
+
+function ensureStandardEnrollment(companyId: number, source: EducationForm[]) {
+  const standard = enrollmentTemplate(companyId)
+  const existing = source.find(form => form.kind === 'enrollment')
+  const normalized: EducationForm = existing
+    ? {
+        ...standard,
+        key: existing.key || standard.key,
+        publicId: existing.publicId,
+        active: Boolean(existing.active),
+        createdAt: existing.createdAt || standard.createdAt,
+        updatedAt: now(),
+      }
+    : standard
+  return [normalized, ...source.filter(form => form.kind !== 'enrollment')]
 }
 
 function localFormsKey(companyId: number) { return `zivifactura.education.forms.${companyId}` }
@@ -169,7 +193,59 @@ function publicPayload(form: EducationForm, company: Company, ownerUid: string) 
       helpText: field.helpText || '',
       options: field.options || [],
     })),
-    updatedAt: serverTimestamp(),
+    updatedAt: now(),
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), ms)
+    promise.then(
+      value => { window.clearTimeout(timer); resolve(value) },
+      error => { window.clearTimeout(timer); reject(error) },
+    )
+  })
+}
+
+function restValue(value: unknown): Record<string, unknown> {
+  if (value === null || value === undefined) return { nullValue: null }
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(restValue) } }
+  switch (typeof value) {
+    case 'string': return { stringValue: value }
+    case 'boolean': return { booleanValue: value }
+    case 'number': return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value }
+    case 'object': {
+      const fields: Record<string, unknown> = {}
+      Object.entries(value as Record<string, unknown>).forEach(([key, entry]) => {
+        if (entry !== undefined) fields[key] = restValue(entry)
+      })
+      return { mapValue: { fields } }
+    }
+    default: return { stringValue: String(value) }
+  }
+}
+
+function restFields(value: Record<string, unknown>) {
+  const fields: Record<string, unknown> = {}
+  Object.entries(value).forEach(([key, entry]) => {
+    if (entry !== undefined) fields[key] = restValue(entry)
+  })
+  return fields
+}
+
+async function publishFormViaRest(formId: string, payload: Record<string, unknown>) {
+  const user = firebaseAuth?.currentUser
+  if (!user) throw new Error('No hay una sesión activa para publicar la inscripción.')
+  const token = await withTimeout(user.getIdToken(), 4000, 'No se pudo obtener la sesión de Firebase.')
+  const endpoint = `https://firestore.googleapis.com/v1/projects/zivifactura/databases/(default)/documents/publicForms/${encodeURIComponent(formId)}`
+  const response = await withTimeout(fetch(endpoint, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: restFields(payload) }),
+  }), 8000, 'Firestore REST no respondió a tiempo.')
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`Firestore REST ${response.status}: ${detail.slice(0, 220)}`)
   }
 }
 
