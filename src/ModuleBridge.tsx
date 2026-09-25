@@ -38,16 +38,19 @@ export default function ModuleBridge() {
         const educational = company?.businessProfile === 'education' || modules.has('education_enrollment') || modules.has('tuition')
 
         grids.forEach(grid => {
-          grid.querySelectorAll('[data-zivi-module="education"], [data-zivi-module="tuition"]').forEach(node => node.remove())
-          if (!educational) return
+          if (!educational) {
+            grid.querySelectorAll('[data-zivi-module="education"], [data-zivi-module="tuition"]').forEach(node => node.remove())
+            return
+          }
 
-          if (company?.businessProfile === 'education' || modules.has('education_enrollment')) {
+          if ((company?.businessProfile === 'education' || modules.has('education_enrollment')) && !grid.querySelector('[data-zivi-module="education"]')) {
             grid.prepend(makeButton('education', educationIcon, 'Inscripciones', 'Planillas, respuestas y aprobación', 'zivifactura:open-education'))
           }
-          if (company?.businessProfile === 'education' || modules.has('tuition')) {
+          if ((company?.businessProfile === 'education' || modules.has('tuition')) && !grid.querySelector('[data-zivi-module="tuition"]')) {
             const enrollmentButton = grid.querySelector('[data-zivi-module="education"]')
             const tuitionButton = makeButton('tuition', tuitionIcon, 'Mensualidades', 'Cobros recurrentes, mora y estados de cuenta', 'zivifactura:open-tuition')
-            enrollmentButton?.insertAdjacentElement('afterend', tuitionButton)
+            if (enrollmentButton) enrollmentButton.insertAdjacentElement('afterend', tuitionButton)
+            else grid.prepend(tuitionButton)
           }
         })
       } finally {
