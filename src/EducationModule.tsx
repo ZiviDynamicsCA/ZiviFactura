@@ -636,8 +636,8 @@ export default function EducationModule() {
   if (!open) return null
 
   const checklist = [
-    { label: 'Editar planilla', done: Boolean(activeForm) },
-    { label: 'Publicar enlace', done: Boolean(activeForm?.active && activeForm?.publicId) },
+    { label: 'Planilla estándar lista', done: Boolean(activeForm?.kind === 'enrollment') },
+    { label: 'Enlace compartible', done: Boolean(activeForm?.active && activeForm?.publicId) },
     { label: 'Recibir respuestas', done: submissions.length > 0 },
     { label: 'Aprobar y cobrar', done: submissions.some(item => item.status === 'approved') },
   ]
@@ -689,7 +689,7 @@ export default function EducationModule() {
 
         {tab === 'forms' && <div className="educationWorkspace">
           <aside className="educationFormList">
-            <div className="educationListHead"><div><small>FORMULARIOS</small><strong>{forms.length} planilla(s)</strong></div><button onClick={() => void createForm()} title="Nueva planilla"><Plus size={18}/></button></div>
+            <div className="educationListHead"><div><small>INSCRIPCIÓN</small><strong>Plantilla estándar</strong></div></div>
             {forms.map(form => <button key={form.key} className={activeForm?.key === form.key ? 'active' : ''} onClick={() => setActiveKey(form.key)}><span>{form.kind === 'enrollment' ? <GraduationCap size={17}/> : <ClipboardList size={17}/>}</span><div><strong>{form.title}</strong><small>{form.active ? 'Publicada' : 'Borrador'} · {questionCount(form)} preguntas</small></div></button>)}
             {!forms.length && <p>No hay planillas todavía.</p>}
           </aside>
@@ -697,35 +697,60 @@ export default function EducationModule() {
           <main className="educationEditor">
             {activeForm ? <>
               <div className="educationEditorHead">
-                <div><span className="educationEyebrow">EDITOR GUIADO</span><h2>{activeForm.title}</h2><p>{questionCount(activeForm)} preguntas · {requiredCount(activeForm)} obligatorias · {fieldGroups.length} secciones</p></div>
-                <div><button className="educationGhost" disabled={busy} onClick={() => void saveForm()}><Save size={16}/>Guardar</button>{activeForm.active ? <button className="educationWarn" disabled={busy} onClick={() => void unpublishForm()}>Pausar</button> : <button className="educationPrimary small" disabled={busy || !hasCloudSession} onClick={() => void publishForm()}><Send size={16}/>Publicar</button>}</div>
+                <div><span className="educationEyebrow">{activeForm.kind === 'enrollment' ? 'PLANILLA ESTÁNDAR' : 'EDITOR GUIADO'}</span><h2>{activeForm.title}</h2><p>{questionCount(activeForm)} preguntas · {requiredCount(activeForm)} obligatorias · {fieldGroups.length} secciones</p></div>
+                <div>{activeForm.kind === 'enrollment'
+                  ? <><button className="educationPrimary small" disabled={!hasCloudSession} onClick={() => void shareForm()}><Send size={16}/>Compartir inscripción</button>{activeForm.active && <button className="educationWarn" disabled={busy} onClick={() => void unpublishForm()}>Pausar enlace</button>}</>
+                  : <><button className="educationGhost" disabled={busy} onClick={() => void saveForm()}><Save size={16}/>Guardar</button>{activeForm.active ? <button className="educationWarn" disabled={busy} onClick={() => void unpublishForm()}>Pausar</button> : <button className="educationPrimary small" disabled={busy || !hasCloudSession} onClick={() => void publishForm()}><Send size={16}/>Publicar</button>}</>}
+                </div>
               </div>
 
-              {!hasCloudSession && <div className="educationNotice"><strong>Modo local de edición</strong><span>Inicia sesión para publicar un enlace real y recibir respuestas desde otros teléfonos.</span></div>}
+              {!hasCloudSession && <div className="educationNotice"><strong>Inicia sesión para compartir</strong><span>La planilla estándar ya está lista; solo necesitas una sesión activa para generar el enlace público.</span></div>}
 
-              <div className="educationFormMeta">
-                <label><span>Título visible para representantes</span><input value={activeForm.title} onChange={event => updateActive({ title: event.target.value })}/></label>
-                <label><span>Mensaje inicial</span><textarea rows={3} value={activeForm.description} onChange={event => updateActive({ description: event.target.value })}/></label>
-              </div>
-
-              {publicUrl ? <div className="educationShare"><div><span>ENLACE DE INSCRIPCIÓN</span><strong>{publicUrl}</strong></div><button onClick={() => void copyText(publicUrl)} title="Copiar enlace"><Copy size={17}/></button><button onClick={() => void shareForm()} title="Compartir"><Send size={17}/></button><a href={publicUrl} target="_blank" rel="noreferrer" title="Abrir"><ExternalLink size={17}/></a></div> : <div className="educationFlowNote"><strong>Flujo de prueba</strong><span>Guarda la planilla → publícala → comparte el enlace → recibe respuestas → aprueba → crea cliente para inscripción, mensualidad o mora.</span></div>}
-
-              <div className="educationFields grouped">
-                {fieldGroups.map((group, groupIndex) => <details className="educationFieldGroup" key={group.section.id} open={groupIndex === 0}>
-                  <summary><span>{groupIndex + 1}</span><div><strong>{group.section.label}</strong><small>{group.rows.length} pregunta(s) en esta sección</small></div></summary>
-                  {group.sectionIndex >= 0 && <div className="educationSectionTools"><label><span>Nombre de la sección</span><input value={group.section.label} onChange={event => updateField(group.section.id, { label: event.target.value })}/></label><div><button disabled={group.sectionIndex === 0} onClick={() => moveField(group.section.id, -1)}><ArrowUp size={15}/></button><button disabled={group.sectionIndex === activeForm.fields.length - 1} onClick={() => moveField(group.section.id, 1)}><ArrowDown size={15}/></button><button onClick={() => removeField(group.section.id)}><Trash2 size={15}/></button></div></div>}
-                  <div className="educationQuestionStack">
-                    {group.rows.map(({ field, index, number }) => <article className="educationQuestion" key={field.id}>
-                      <div className="educationQuestionTop"><span>{number}</span><input value={field.label} onChange={event => updateField(field.id, { label: event.target.value })}/><div><button disabled={index === 0} onClick={() => moveField(field.id, -1)}><ArrowUp size={15}/></button><button disabled={index === activeForm.fields.length - 1} onClick={() => moveField(field.id, 1)}><ArrowDown size={15}/></button><button onClick={() => removeField(field.id)}><Trash2 size={15}/></button></div></div>
-                      <div className="educationQuestionOptions"><label><span>Tipo</span><select value={field.type} onChange={event => updateField(field.id, { type: event.target.value as FieldType })}>{Object.entries(FIELD_TYPE_LABELS).filter(([key]) => key !== 'section').map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label><label className="educationCheck"><input type="checkbox" checked={Boolean(field.required)} onChange={event => updateField(field.id, { required: event.target.checked })}/><span>Obligatoria</span></label>{(field.type === 'select' || field.type === 'radio') && <label className="wide"><span>Opciones separadas por coma</span><input value={(field.options || []).join(', ')} onChange={event => updateField(field.id, { options: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })}/></label>}</div>
-                    </article>)}
+              {activeForm.kind === 'enrollment' ? <>
+                <section className="educationStandardShareCard">
+                  <div className="educationStandardShareCopy">
+                    <span>LISTA PARA PADRES Y REPRESENTANTES</span>
+                    <h3>Comparte la inscripción sin editar ni construir formularios.</h3>
+                    <p>La planilla ya contiene el estándar del centro. El representante abre el enlace, completa los datos y la respuesta llega directamente a ZiviFactura.</p>
+                    <div className="educationStandardStatus"><CheckCircle2 size={16}/><strong>{publicUrl ? 'Enlace generado' : 'Se genera al compartir'}</strong><small>Publicación en segundo plano, sin bloquear la interfaz.</small></div>
                   </div>
-                  <button className="educationAddQuestion compact" onClick={() => addField(group.rows.at(-1)?.index ?? group.sectionIndex)}><Plus size={17}/>Agregar pregunta en esta sección</button>
-                </details>)}
-                <button className="educationAddQuestion" onClick={() => addField()}><Plus size={17}/>Agregar pregunta al final</button>
-              </div>
+                  <div className="educationStandardActions">
+                    <button className="educationPrimary" disabled={!hasCloudSession} onClick={() => void shareForm()}><Send size={17}/>Compartir inscripción</button>
+                    {publicUrl && <><button className="educationGhost" onClick={() => void copyText(publicUrl)}><Copy size={16}/>Copiar enlace</button><a className="educationOpenLink" href={publicUrl} target="_blank" rel="noreferrer"><ExternalLink size={16}/>Abrir formulario</a></>}
+                  </div>
+                </section>
 
-              <div className="educationEditorFooter"><button className="educationDanger" onClick={() => void deleteForm()}><Trash2 size={16}/>Eliminar planilla</button><button className="educationPrimary" disabled={busy} onClick={() => void saveForm()}><Save size={16}/>Guardar cambios</button></div>
+                <details className="educationStandardDetails">
+                  <summary><span><ClipboardList size={17}/>Ver campos incluidos en la planilla estándar</span><small>{questionCount(activeForm)} preguntas organizadas en {fieldGroups.length} secciones</small></summary>
+                  <div className="educationStandardFieldList">
+                    {fieldGroups.map((group, groupIndex) => <section key={group.section.id}><div><b>{groupIndex + 1}</b><strong>{group.section.label.replace(/^\d+\.\s*/, '')}</strong></div>{group.rows.map(({ field }) => <p key={field.id}><span>{field.required ? 'Obligatorio' : 'Opcional'}</span>{field.label}</p>)}</section>)}
+                  </div>
+                </details>
+              </> : <>
+                <div className="educationFormMeta">
+                  <label><span>Título visible para representantes</span><input value={activeForm.title} onChange={event => updateActive({ title: event.target.value })}/></label>
+                  <label><span>Mensaje inicial</span><textarea rows={3} value={activeForm.description} onChange={event => updateActive({ description: event.target.value })}/></label>
+                </div>
+
+                {publicUrl ? <div className="educationShare"><div><span>ENLACE DE INSCRIPCIÓN</span><strong>{publicUrl}</strong></div><button onClick={() => void copyText(publicUrl)} title="Copiar enlace"><Copy size={17}/></button><button onClick={() => void shareForm()} title="Compartir"><Send size={17}/></button><a href={publicUrl} target="_blank" rel="noreferrer" title="Abrir"><ExternalLink size={17}/></a></div> : <div className="educationFlowNote"><strong>Flujo de prueba</strong><span>Guarda la planilla → publícala → comparte el enlace → recibe respuestas → aprueba → crea cliente.</span></div>}
+
+                <div className="educationFields grouped">
+                  {fieldGroups.map((group, groupIndex) => <details className="educationFieldGroup" key={group.section.id} open={groupIndex === 0}>
+                    <summary><span>{groupIndex + 1}</span><div><strong>{group.section.label}</strong><small>{group.rows.length} pregunta(s) en esta sección</small></div></summary>
+                    {group.sectionIndex >= 0 && <div className="educationSectionTools"><label><span>Nombre de la sección</span><input value={group.section.label} onChange={event => updateField(group.section.id, { label: event.target.value })}/></label><div><button disabled={group.sectionIndex === 0} onClick={() => moveField(group.section.id, -1)}><ArrowUp size={15}/></button><button disabled={group.sectionIndex === activeForm.fields.length - 1} onClick={() => moveField(group.section.id, 1)}><ArrowDown size={15}/></button><button onClick={() => removeField(group.section.id)}><Trash2 size={15}/></button></div></div>}
+                    <div className="educationQuestionStack">
+                      {group.rows.map(({ field, index, number }) => <article className="educationQuestion" key={field.id}>
+                        <div className="educationQuestionTop"><span>{number}</span><input value={field.label} onChange={event => updateField(field.id, { label: event.target.value })}/><div><button disabled={index === 0} onClick={() => moveField(field.id, -1)}><ArrowUp size={15}/></button><button disabled={index === activeForm.fields.length - 1} onClick={() => moveField(field.id, 1)}><ArrowDown size={15}/></button><button onClick={() => removeField(field.id)}><Trash2 size={15}/></button></div></div>
+                        <div className="educationQuestionOptions"><label><span>Tipo</span><select value={field.type} onChange={event => updateField(field.id, { type: event.target.value as FieldType })}>{Object.entries(FIELD_TYPE_LABELS).filter(([key]) => key !== 'section').map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label><label className="educationCheck"><input type="checkbox" checked={Boolean(field.required)} onChange={event => updateField(field.id, { required: event.target.checked })}/><span>Obligatoria</span></label>{(field.type === 'select' || field.type === 'radio') && <label className="wide"><span>Opciones separadas por coma</span><input value={(field.options || []).join(', ')} onChange={event => updateField(field.id, { options: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })}/></label>}</div>
+                      </article>)}
+                    </div>
+                    <button className="educationAddQuestion compact" onClick={() => addField(group.rows.at(-1)?.index ?? group.sectionIndex)}><Plus size={17}/>Agregar pregunta en esta sección</button>
+                  </details>)}
+                  <button className="educationAddQuestion" onClick={() => addField()}><Plus size={17}/>Agregar pregunta al final</button>
+                </div>
+
+                <div className="educationEditorFooter"><button className="educationDanger" onClick={() => void deleteForm()}><Trash2 size={16}/>Eliminar planilla</button><button className="educationPrimary" disabled={busy} onClick={() => void saveForm()}><Save size={16}/>Guardar cambios</button></div>
+              </>}
             </> : <div className="educationEmpty"><ClipboardList size={30}/><h3>Crea tu primera planilla</h3><p>La plantilla educativa organiza la información por secciones para que el centro pueda revisar sin transcribir datos.</p><button className="educationPrimary" onClick={() => void activate()}><Plus size={17}/>Crear plantilla base</button></div>}
           </main>
         </div>}
